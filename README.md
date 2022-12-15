@@ -8,6 +8,22 @@ Run:
 ```
 python3 read_wfc.py
 ```
+4. Configuration:
+```
+usage: read_wfc.py [-h] [-w WFC_FILE] [-x XML_FILE] [-d DELTA] [-t THREAD]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -w WFC_FILE, --wfc_file WFC_FILE
+                        filename that include wfc. Default: wfc1.dat
+  -x XML_FILE, --xml_file XML_FILE
+                        filename that include xml data. Default: data-file-
+                        schema.xml
+  -d DELTA, --delta DELTA
+                        delta that control local VB/CB. Default: 0.001
+  -t THREAD, --thread THREAD
+                        num of thread. Default: 15
+```
 
 ## Requirements
 version of Quantum Espresso >= 5.4
