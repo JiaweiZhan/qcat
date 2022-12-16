@@ -62,8 +62,8 @@ if __name__ == "__main__":
 
         # store and read
         if args.backup == 1:
-            storeFolder = './wfc1'
-            utils.storeGvec(xml_data, wfc_data, Store=True, storeFolder=storeFolder)
+            storeFolder = wfc_files[index].split('/')[-1].split('.')[0]
+            utils.storeGvec(xml_data, wfc_data, Store=True, storeFolder=storeFolder, threadNum=args.thread)
             for ibnd in tqdm(range(wfc_data['nbnd']), desc='read wfc from store file'):
                 wfcName = storeFolder + '/wfc_r_' + str(ibnd + 1).zfill(5) + '.npy'
                 evc_r = np.load(wfcName)
