@@ -343,9 +343,9 @@ if __name__=="__main__":
     # get the start time
     st = time.time()
 
-    xml_data = parse_QE_XML('./si_si3n4.save/data-file-schema.xml')
-    # wfc_data = parse_QE_wfc('./si_si3n4.save/wfc1.dat')
-    # storeGvec(xml_data, wfc_data, realSpace=True, Store=True, storeFolder='./wfc1/')
+    xml_data = parse_QE_XML('../si_si3n4.save/data-file-schema.xml')
+    wfc_data = parse_QE_wfc('../si_si3n4.save/wfc1.dat')
+    storeGvec(xml_data, wfc_data, realSpace=False, Store=True, storeFolder='./wfc1/', threadNum=39)
     # print(wfc_data["ngw"])
     # print(xml_data["occ"])
 
