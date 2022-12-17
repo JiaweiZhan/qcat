@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--delta", type=float,
             help="delta that control local VB/CB. Default: 0.001")
     parser.add_argument("-t", "--thread", type=int,
-            help="num of thread. Default: 10")
+            help="num of thread. Default: max_thread - 1")
     parser.add_argument("-b", "--backup", type=int,
             help="store wfc on disk 1 or not 0 (store in memory). Default: 0")
     args = parser.parse_args()
@@ -40,7 +40,9 @@ if __name__ == "__main__":
         args.save_folder = "./scf.save"
     assert(os.path.exists(args.save_folder))
     if not args.thread:
-        args.thread = 10 
+        # get the number of logical cpu cores
+        n_cores = int(os.cpu_count())
+        args.thread = n_cores - 1 
     if not args.delta:
         args.delta = 0.001 
     if not args.backup:
@@ -51,10 +53,12 @@ if __name__ == "__main__":
 
     utils.delta = args.delta
 
-    print(f"configurations:\
-            \n\t{'QE save folder:':^35}{args.save_folder:^20}\
-            \n\t{'delta:':^35}{args.delta:^20}\
-            \n\t{'threads:':^35}{args.thread:^20}\
+    print(f"configure:\
+            \n {''.join(['-'] * 41)}\
+            \n{'QE save folder':^20}:{args.save_folder:^20}\
+            \n{'delta':^20}:{args.delta:^20}\
+            \n{'threads':^20}:{args.thread:^20}\
+            \n {''.join(['-'] * 41)}\n\
             ")
 
     # -----------------------------------------------------------------------------
@@ -82,15 +86,18 @@ if __name__ == "__main__":
             storeFolder = wfc_files[index].split('/')[-1].split('.')[0]
             storeFolders.append(storeFolder)
             utils.storeGvec(xml_data, wfc_data, Store=True, storeFolder=storeFolder, threadNum=args.thread)
-            for ibnd in tqdm(range(wfc_data['nbnd']), desc='read wfc from store file'):
-                wfcName = storeFolder + '/wfc_r_' + str(ibnd + 1).zfill(5) + '.npy'
+            wfcStored = os.listdir(storeFolder)
+            for fileName in tqdm(wfcStored, desc='read wfc from stored file'):
+                wfcName = storeFolder + '/' + fileName
+                ibnd = int(fileName.split('.')[0].split('_')[-1])
                 evc_r = np.load(wfcName)
-                utils.ksStateZAve[ik - 1, ibnd, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
+                utils.ksStateZAve[ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
             shutil.rmtree(storeFolder)
         else:
             # direct comput and store in memory
             evc_r = utils.storeGvec(xml_data, wfc_data, Store=False)
             utils.ksStateZAve[ik - 1, :, :] = np.sum(np.absolute(evc_r) ** 2, axis=(1, 2,))
+        print('\n')
 
     utils.lcbm = np.zeros(fft_grid[2])
     utils.lvbm = np.zeros(fft_grid[2])

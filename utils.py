@@ -253,13 +253,10 @@ def storeGvec(xml_data, wfc_data, realSpace=True, Store=False, storeFolder=None,
         if allZeroIndex != -1:
             millIndex = np.delete(millIndex, allZeroIndex, axis=0)
 
-        chunk_ibnd = wfc_data['nbnd'] / threadNum
         lock_Ibnds.acquire()
         global storeIbndList
-        storeIbndList = []
-        for i in range(threadNum):
-            storeIbndList.append(list(range(wfc_data['nbnd']))[int(i * chunk_ibnd): int((i + 1) * chunk_ibnd)])
-        storeIbndList.append([])
+        storeIbndList = list(range(wfc_data['nbnd']))
+        storeIbndList.append(-1)
         iBnds_condition.notify_all()
         lock_Ibnds.release()
         
@@ -294,49 +291,49 @@ def storeGvec(xml_data, wfc_data, realSpace=True, Store=False, storeFolder=None,
         return
 
 def storeGWorker(wfc_data, millIndex, fft_grid, allZeroIndex, storeFolder, realSpace, id):
-    lock_Ibnds.acquire()
-    while len(storeIbndList) == 0:
-        iBnds_condition.wait()
-    iBnds = storeIbndList.pop(0)
-    # poison
-    if len(iBnds) == 0:
-        storeIbndList.append([])
+    while True:
+        lock_Ibnds.acquire()
+        while len(storeIbndList) == 0:
+            iBnds_condition.wait()
+        iBnd = storeIbndList.pop(0)
+        # poison
+        if iBnd == -1:
+            storeIbndList.append(-1)
+            lock_Ibnds.release()
+            return
+        # not a poison
         lock_Ibnds.release()
-        return
-    # not a poison
-    lock_Ibnds.release()
 
-    if id == 0:
-        for ibnd in tqdm(iBnds, desc='store ibnd'):
+        if id == 0:
+            # for ibnd in tqdm(iBnds, desc='store ibnd'):
             evc_g = np.zeros([fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            wfc_slice = list(wfc_data['evc'][ibnd, :])
-            evc_g[wfc_data['mill'][:, 0], wfc_data['mill'][:, 1], wfc_data['mill'][:, 2]] = wfc_data['evc'][ibnd, :]
+            wfc_slice = wfc_data['evc'][iBnd, :]
+            evc_g[wfc_data['mill'][:, 0], wfc_data['mill'][:, 1], wfc_data['mill'][:, 2]] = wfc_data['evc'][iBnd, :]
             if allZeroIndex != -1:
-                del wfc_slice[allZeroIndex]
-            evc_g[ - millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
+                wfc_slice = np.delete(wfc_slice, allZeroIndex)
+            evc_g[- millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
             evc_r = None
             if not realSpace:
-                wfcName = 'wfc_g_' + str(ibnd + 1).zfill(5)
+                wfcName = 'wfc_g_' + str(iBnd + 1).zfill(5)
                 np.save(storeFolder + '/' + wfcName, evc_g)
             else:
                 evc_r = np.fft.ifftn(evc_g, norm='forward')
-                wfcName = 'wfc_r_' + str(ibnd + 1).zfill(5)
+                wfcName = 'wfc_r_' + str(iBnd + 1).zfill(5)
                 np.save(storeFolder + '/' + wfcName, evc_r)
-    else:
-        for ibnd in iBnds:
+        else:
             evc_g = np.zeros([fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            wfc_slice = list(wfc_data['evc'][ibnd, :])
-            evc_g[wfc_data['mill'][:, 0], wfc_data['mill'][:, 1], wfc_data['mill'][:, 2]] = wfc_data['evc'][ibnd, :]
+            wfc_slice = wfc_data['evc'][iBnd, :]
+            evc_g[wfc_data['mill'][:, 0], wfc_data['mill'][:, 1], wfc_data['mill'][:, 2]] = wfc_data['evc'][iBnd, :]
             if allZeroIndex != -1:
-                del wfc_slice[allZeroIndex]
-            evc_g[ - millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
+                wfc_slice = np.delete(wfc_slice, allZeroIndex)
+            evc_g[- millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
             evc_r = None
             if not realSpace:
-                wfcName = 'wfc_g_' + str(ibnd + 1).zfill(5)
+                wfcName = 'wfc_g_' + str(iBnd + 1).zfill(5)
                 np.save(storeFolder + '/' + wfcName, evc_g)
             else:
                 evc_r = np.fft.ifftn(evc_g, norm='forward')
-                wfcName = 'wfc_r_' + str(ibnd + 1).zfill(5)
+                wfcName = 'wfc_r_' + str(iBnd + 1).zfill(5)
                 np.save(storeFolder + '/' + wfcName, evc_r)
 
 if __name__=="__main__":
@@ -345,7 +342,7 @@ if __name__=="__main__":
 
     xml_data = parse_QE_XML('../si_si3n4.save/data-file-schema.xml')
     wfc_data = parse_QE_wfc('../si_si3n4.save/wfc1.dat')
-    storeGvec(xml_data, wfc_data, realSpace=False, Store=True, storeFolder='./wfc1/', threadNum=39)
+    storeGvec(xml_data, wfc_data, realSpace=False, Store=True, storeFolder='./wfc1/', threadNum=20)
     # print(wfc_data["ngw"])
     # print(xml_data["occ"])
 
