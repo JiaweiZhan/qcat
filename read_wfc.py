@@ -11,6 +11,7 @@ store = False
 storeFolders = []
 
 def handler(signum, frame):
+    # handler for handle ctrl-C
     print("", end="\r", flush=True)
     print("clean store file", flush=True)
     if store:

@@ -6,6 +6,13 @@ import os, time
 import threading
 
 def parse_QE_XML(file_name):
+    """
+    analyze QE data-file-schema.xml
+        param:
+            file_name: str
+        return:
+             dict of {'nks', 'kweights', 'nbnd', 'eigen', 'occ', 'fftw'}
+    """
     file = minidom.parse(file_name)
     # num of KS states
     nbnd_nodes = file.getElementsByTagName('nbnd')
@@ -49,6 +56,13 @@ def parse_QE_XML(file_name):
     return out_dict 
 
 def parse_QE_wfc(file_name):
+    """
+    analyze QE wfc*.dat 
+        param:
+            file_name: str
+        return:
+             dict of {'ik', 'xk', 'ispin', 'nbnd', 'ngw', 'evc'...}
+    """
     with open(file_name, 'rb') as f:
         # Moves the cursor 4 bytes to the right
         f.seek(4)
@@ -111,7 +125,12 @@ eigens = None               # [nks * nbnds]
 delta = None
 
 def ldos_worker(id):
-    # worker to compute LCBM and LVBM for multiple z axis in z_axis_assign
+    """
+    worker to compute LCBM and LVBM for multiple 
+    z axis in z_axis_assign in a multi-threaded way
+        param:
+            id: int
+    """
     lock_list.acquire()
     while len(z_axis_assign) == 0:
         condition_list.wait()
@@ -222,6 +241,17 @@ lock_Ibnds = threading.Lock()
 iBnds_condition = threading.Condition(lock_Ibnds)
 
 def storeGvec(xml_data, wfc_data, realSpace=True, Store=False, storeFolder=None, threadNum=None):
+    """
+    worker to storeGVec in a multi-threaded way
+    by either storing wfc in memory or disk
+    param:
+        xml_data: return of parse_QE_XML
+        wfc_data: return of parse_QE_wfc
+        realSpace: bool, whether convert wfc to real space
+        Store: bool, whether store wfc on disk to save memory
+        storeFolder: str, whether the wfc is strored
+        threadNum: number of thread to store wfc
+    """
     fft_grid = xml_data['fftw']
     fft_grid = np.array(fft_grid) // 2 + 1
     if not Store:
