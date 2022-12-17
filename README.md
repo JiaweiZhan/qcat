@@ -16,7 +16,7 @@ optional arguments:
   -d DELTA, --delta DELTA
                         delta that control local VB/CB. Default: 0.001
   -t THREAD, --thread THREAD
-                        num of thread. Default: 10
+                        num of thread. Default: max_thread - 1
   -b BACKUP, --backup BACKUP
                         store wfc on disk 1 or not 0 (store in memory). Default: 0
 ```
