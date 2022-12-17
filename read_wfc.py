@@ -69,18 +69,20 @@ if __name__ == "__main__":
     xml_data = utils.parse_QE_XML(xml_file)
     # num of occupied bands
     nks = xml_data['nks']
-    utils.numOcc = xml_data['occ']   # [nks * nbnds]
+    nspin = xml_data['nspin']
+    utils.numOcc = xml_data['occ']   # [nspin * nks * nbnds]
     utils.kWeights = xml_data['kweights']
     utils.tot_bands = xml_data['nbnd']
-    utils.eigens = xml_data['eigen'] # [nks * nbnds]
+    utils.eigens = xml_data['eigen'] # [nspin * nks * nbnds]
     fft_grid = xml_data['fftw']
     fft_grid = np.array(fft_grid) // 2 + 1
 
-    utils.ksStateZAve = np.zeros((nks, utils.tot_bands, fft_grid[2]))
-    for index in range(nks):
+    utils.ksStateZAve = np.zeros((nspin, nks, utils.tot_bands, fft_grid[2]))
+    for index in range(nks * nspin):
         wfc_data = utils.parse_QE_wfc(wfc_files[index])
         ik = wfc_data['ik']
-        print(f"'ik: ': {ik}, nbnd: {wfc_data['nbnd']}, npol: {wfc_data['npol']}, igwx: {wfc_data['igwx']}")
+        ispin = wfc_data['ispin']
+        print(f"ik: {ik}, ispin: {ispin}, nbnd: {wfc_data['nbnd']}, npol: {wfc_data['npol']}, igwx: {wfc_data['igwx']}")
 
         # store and read
         if args.backup == 1:
@@ -92,12 +94,12 @@ if __name__ == "__main__":
                 wfcName = storeFolder + '/' + fileName
                 ibnd = int(fileName.split('.')[0].split('_')[-1])
                 evc_r = np.load(wfcName)
-                utils.ksStateZAve[ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
+                utils.ksStateZAve[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
             shutil.rmtree(storeFolder)
         else:
             # direct comput and store in memory
             evc_r = utils.storeGvec(xml_data, wfc_data, Store=False)
-            utils.ksStateZAve[ik - 1, :, :] = np.sum(np.absolute(evc_r) ** 2, axis=(1, 2,))
+            utils.ksStateZAve[ispin - 1, ik - 1, :, :] = np.sum(np.absolute(evc_r) ** 2, axis=(1, 2,))
         print('\n')
 
     utils.lcbm = np.zeros(fft_grid[2])

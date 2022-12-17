@@ -13,45 +13,75 @@ def parse_QE_XML(file_name):
         return:
              dict of {'nks', 'kweights', 'nbnd', 'eigen', 'occ', 'fftw'}
     """
+    # unit convert
+    hartree2ev = 27.2114
     file = minidom.parse(file_name)
+    # spin
+    spin_nodes = file.getElementsByTagName('spin')
+    lsda_nodes = spin_nodes[0].getElementsByTagName('lsda')
+    nspin = 1
+    if lsda_nodes[0].firstChild.data == 'true':
+        nspin = 2
+
+
     # num of KS states
+    nbnd_up, nbnd_dw = -1, -1
     nbnd_nodes = file.getElementsByTagName('nbnd')
     nbnd = int(nbnd_nodes[0].firstChild.data)
+    if nspin == 2:
+        nbnd_up_nodes = file.getElementsByTagName('nbnd_up')
+        nbnd_up = int(nbnd_up_nodes[0].firstChild.data)
+        nbnd_dw_nodes = file.getElementsByTagName('nbnd_dw')
+        nbnd_dw = int(nbnd_dw_nodes[0].firstChild.data)
+        assert(nbnd == nbnd_dw and nbnd == nbnd_up)
+
+    # fermi energy
+    fermi_nodes = file.getElementsByTagName('fermi_energy')
+    fermiEne = float(fermi_nodes[0].firstChild.data) * hartree2ev
 
     # num of kpoints
     nks_nodes = file.getElementsByTagName('nks')
     nks = int(nks_nodes[0].firstChild.data)
-    eigenvalues, occupations, weights = [], [], []
+ 
+    # [nspin * nks * nbnd]
+    eigenvalues, occupations, weights = np.zeros((nspin, nks, nbnd)), np.zeros((nspin, nks, nbnd)), np.zeros(nks)
 
     ks_nodes = file.getElementsByTagName('ks_energies')
-    for ks_node in ks_nodes:
+    for index, ks_node in enumerate(ks_nodes):
         # kpoint weight
         k_point_node = ks_node.getElementsByTagName('k_point')
-        weight_ = float(k_point_node[0].attributes['weight'].value)
-        weights.append(weight_)
+        weights[index] = float(k_point_node[0].attributes['weight'].value)
 
         # eigenvalues
         eigens_node = ks_node.getElementsByTagName('eigenvalues')
         eigenvalue_ = eigens_node[0].firstChild.data
-        eigenvalue_ = [float(num) * 27.2114 for num in eigenvalue_.split()]
-        eigenvalues.append(eigenvalue_)
+        eigenvalue_ = [float(num) * hartree2ev for num in eigenvalue_.split()]
+        for ispin in range(nspin):
+            eigenvalues[ispin, index, :] = eigenvalue_[ispin * nbnd : (ispin + 1) * nbnd]
 
         # occupation
-        occ_nodes = ks_node.getElementsByTagName('occupations')
-        occupation_ = occ_nodes[0].firstChild.data
-        occupation_ = [float(num) for num in occupation_.split()]
-        occupations.append(occupation_)
+        # occ_nodes = ks_node.getElementsByTagName('occupations')
+        # occupation_ = occ_nodes[0].firstChild.data
+        # occupation_ = [float(num) for num in occupation_.split()]
+        # for ispin in range(nspin):
+        #     occupations[ispin, index, :] = occupation_[ispin * nbnd : (ispin + 1) * nbnd]
+
+        # occupation another way
+        occupations[eigenvalues <= fermiEne] = 1
+        occupations[eigenvalues > fermiEne] = 0
 
     # fft grids
     fft_nodes = file.getElementsByTagName('fft_grid')
     np0v = int(fft_nodes[0].attributes['nr1'].value)
     np1v = int(fft_nodes[0].attributes['nr2'].value)
     np2v = int(fft_nodes[0].attributes['nr3'].value)
-    out_dict = {'nks': nks,
-                'kweights': np.array(weights),
+    out_dict = {'nspin': nspin,
+                'nks': nks,
+                'fermi': fermiEne,
+                'kweights': weights,
                 'nbnd': nbnd,
-                'eigen': np.array(eigenvalues),
-                'occ': np.array(occupations),
+                'eigen': eigenvalues,
+                'occ': occupations,
                 'fftw': [np0v, np1v, np2v]}
     return out_dict 
 
@@ -145,15 +175,16 @@ def ldos_worker(id):
 
     if id == 0:
         for z in tqdm(z_axis, desc='compute LDOS'):
-            # ksStateZAve: [ik, ibnd, z]
-            preFactor = ksStateZAve[:, :, z]
-            sumVBTot = np.sum(preFactor * numOcc * kWeights[:, np.newaxis])
+            # ksStateZAve: [ispin, ik, ibnd, z]
+            preFactor = ksStateZAve[:, :, :, z]
+            sumVBTot = np.sum(preFactor * numOcc * kWeights[np.newaxis, :, np.newaxis])
 
             KSEnergyTot = []
             KSFactorTot = []
             for i in range(eigens.shape[0]):
-                KSEnergyTot.extend(eigens[i])
-                KSFactorTot.extend(preFactor[i] * kWeights[i])
+                for j in range(eigens.shape[1]):
+                    KSEnergyTot.extend(eigens[i, j])
+                    KSFactorTot.extend(preFactor[i, j] * kWeights[j])
 
             zipEneFac = zip(KSEnergyTot, KSFactorTot)
             eneSort, facSort = list(zip(*sorted(zipEneFac, key=lambda x: x[0])))
@@ -184,19 +215,19 @@ def ldos_worker(id):
             lcbm[z] = eneSort[max_arg]
     else:
         for z in z_axis:
-            # ksStateZAve: [ik, ibnd, z]
-            preFactor = ksStateZAve[:, :, z]
-            sumVBTot = np.sum(preFactor * numOcc * kWeights[:, np.newaxis])
+            # ksStateZAve: [ispin, ik, ibnd, z]
+            preFactor = ksStateZAve[:, :, :, z]
+            sumVBTot = np.sum(preFactor * numOcc * kWeights[np.newaxis, :, np.newaxis])
 
             KSEnergyTot = []
             KSFactorTot = []
             for i in range(eigens.shape[0]):
-                KSEnergyTot.extend(eigens[i])
-                KSFactorTot.extend(preFactor[i] * kWeights[i])
+                for j in range(eigens.shape[1]):
+                    KSEnergyTot.extend(eigens[i, j])
+                    KSFactorTot.extend(preFactor[i, j] * kWeights[j])
 
             zipEneFac = zip(KSEnergyTot, KSFactorTot)
             eneSort, facSort = list(zip(*sorted(zipEneFac, key=lambda x: x[0])))
-
 
             min_arg = int(np.sum(numOcc)) - 1
             max_arg = int(np.sum(numOcc))
