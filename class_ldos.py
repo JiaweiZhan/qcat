@@ -169,11 +169,11 @@ class LDOS:
         fft_grid = np.array(fft_grid) // 2 + 1
 
         self.ksStateZAve = np.zeros((self.nspin, self.nks, self.nbnd, fft_grid[2]))
-        for index in range(self.nks * self.nspin):
+        for index in tqdm(range(self.nks * self.nspin), desc='read wfc'):
             wfc_data = qe.parse_QE_wfc(wfc_files[index])
             ik = wfc_data['ik']
             ispin = wfc_data['ispin']
-            print(f"ik: {ik}, ispin: {ispin}, nbnd: {wfc_data['nbnd']}, npol: {wfc_data['npol']}, igwx: {wfc_data['igwx']}")
+            # print(f"ik: {ik}, ispin: {ispin}, nbnd: {wfc_data['nbnd']}, npol: {wfc_data['npol']}, igwx: {wfc_data['igwx']}")
 
             # store and read
             if self.backup == 1:
@@ -181,7 +181,8 @@ class LDOS:
                 self.storeFolder = storeFolder
                 qe.computeWFC(Store=True, storeFolder=storeFolder)
                 wfcStored = os.listdir(storeFolder)
-                for fileName in tqdm(wfcStored, desc='read wfc from stored file'):
+                # for fileName in tqdm(wfcStored, desc='read wfc from stored file'):
+                for fileName in wfcStored:
                     wfcName = storeFolder + '/' + fileName
                     ibnd = int(fileName.split('.')[0].split('_')[-1])
                     evc_r = np.load(wfcName)
@@ -189,9 +190,8 @@ class LDOS:
                 shutil.rmtree(storeFolder)
             else:
                 # direct comput and store in memory
-                evc_r = qe.storeGvec(Store=False)
+                evc_r = qe.computeWFC(Store=False)
                 self.ksStateZAve[ispin - 1, ik - 1, :, :] = np.sum(np.absolute(evc_r) ** 2, axis=(1, 2,))
-            print('\n')
 
         self.lcbm = np.zeros(fft_grid[2])
         self.lvbm = np.zeros(fft_grid[2])

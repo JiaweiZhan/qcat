@@ -36,13 +36,13 @@ if __name__ == "__main__":
     if not args.save_folder:
         args.save_folder = "./scf.save"
     assert(os.path.exists(args.save_folder))
-    if not args.thread:
+    if args.thread is None:
         # get the number of logical cpu cores
         n_cores = int(os.cpu_count())
         args.thread = n_cores - 1 
     if not args.delta:
         args.delta = 0.001 
-    if not args.backup:
+    if args.backup is None:
         args.backup = 1 
 
     if args.backup == 0:
@@ -53,7 +53,7 @@ if __name__ == "__main__":
             \n{'QE save folder':^20}:{args.save_folder:^20}\
             \n{'delta':^20}:{args.delta:^20}\
             \n{'threads':^20}:{args.thread:^20}\
-            \n{'wfc->disk':^20}:{bool(args.backup):^20}\
+            \n{'wfc->disk':^20}:{args.backup:^20}\
             \n {''.join(['-'] * 41)}\n\
             ")
 

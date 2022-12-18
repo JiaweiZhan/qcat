@@ -143,7 +143,8 @@ class QERead:
 
             evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
             f.seek(8,1)
-            for i in tqdm(range(nbnd), desc='read wfc bands'):
+            # for i in tqdm(range(nbnd), desc='read wfc bands'):
+            for i in range(nbnd):
                 evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
                 f.seek(8, 1)
 
@@ -179,10 +180,11 @@ class QERead:
         if not Store:
             # store everyting in memory
             evc_g = np.zeros([self.wfc_data['nbnd'], fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            for index, gvec in enumerate(tqdm(self.wfc_data['mill'], desc='store wfc_g')):
+            # for index, gvec in enumerate(tqdm(self.wfc_data['mill'], desc='store wfc_g')):
+            for index, gvec in enumerate(self.wfc_data['mill']):
                 eig = self.wfc_data['evc'][:, index]
                 evc_g[:, gvec[0], gvec[1], gvec[2]] = eig
-                if self.wfc_data['gamma_only']:
+                if self.wfc_data['gamma_only'] is True:
                     if (gvec[0] != 0 or gvec[1] != 0 or gvec[2] != 0):
                         evc_g[:, -gvec[0], -gvec[1], -gvec[2]] = np.conj(eig)
             if not realSpace:
@@ -261,7 +263,7 @@ class QERead:
             evc_g[self.wfc_data['mill'][:, 0], self.wfc_data['mill'][:, 1], self.wfc_data['mill'][:, 2]] = self.wfc_data['evc'][iBnd, :]
             if allZeroIndex != -1:
                 wfc_slice = np.delete(wfc_slice, allZeroIndex)
-            if self.wfc_data['gamma_only']:
+            if self.wfc_data['gamma_only'] is True:
                 evc_g[- millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
             evc_r = None
             if not realSpace:
