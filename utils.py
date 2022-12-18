@@ -25,15 +25,22 @@ def parse_QE_XML(file_name):
 
 
     # num of KS states
-    nbnd_up, nbnd_dw = -1, -1
+    nbnd_up, nbnd_dw, nbnd = -1, -1, -1
     nbnd_nodes = file.getElementsByTagName('nbnd')
-    nbnd = int(nbnd_nodes[0].firstChild.data)
+    try: 
+        nbnd = int(nbnd_nodes[0].firstChild.data)
+    except IndexError:
+        pass
     if nspin == 2:
         nbnd_up_nodes = file.getElementsByTagName('nbnd_up')
         nbnd_up = int(nbnd_up_nodes[0].firstChild.data)
         nbnd_dw_nodes = file.getElementsByTagName('nbnd_dw')
         nbnd_dw = int(nbnd_dw_nodes[0].firstChild.data)
-        assert(nbnd == nbnd_dw and nbnd == nbnd_up)
+        if nbnd != -1:
+            assert(nbnd == nbnd_dw and nbnd == nbnd_up)
+        else:
+            assert(nbnd_up == nbnd_dw)
+            nbnd = nbnd_dw
 
     # fermi energy
     fermi_nodes = file.getElementsByTagName('fermi_energy')
