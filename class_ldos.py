@@ -25,7 +25,7 @@ class LDOS:
     storeFolder = None
     backup = None
 
-    def __init__(self, delta, numThread, saveFolder, backup):
+    def __init__(self, delta=0.001, numThread=15, saveFolder='./scf.save', backup=1):
         """
         Init LDOS class:
             param:
