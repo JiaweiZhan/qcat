@@ -30,6 +30,7 @@ pyldos is a tool for computing [local density of states](https://en.wikipedia.or
 
 ```
 see [`example.py`](./example.py) for reference
+
 3. Run:
 ```
 python3 example.py [-h] [-s SAVE_FOLDER] [-d DELTA] [-t THREAD] [-b BACKUP]
