@@ -12,7 +12,7 @@ class QERead:
     wfc_data = None
     threadNum = None
 
-    def __init__(self, numThread):
+    def __init__(self, numThread=15):
         self.threadNum = numThread
 
     def parse_QE_XML(self, file_name):
@@ -25,14 +25,22 @@ class QERead:
         """
         # unit convert
         hartree2ev = 27.2114
+
         file = minidom.parse(file_name)
+        # cell
+        cell = np.zeros((3, 3))
+        cell_nodes = file.getElementsByTagName('cell')
+        cellTag = ['a1', 'a2', 'a3']
+        for index, tag in enumerate(cellTag):
+            a_nodes = cell_nodes[0].getElementsByTagName(tag)
+            cell[index, :] = [float(num) for num in a_nodes[0].firstChild.data.split()]
+
         # spin
         spin_nodes = file.getElementsByTagName('spin')
         lsda_nodes = spin_nodes[0].getElementsByTagName('lsda')
         nspin = 1
         if lsda_nodes[0].firstChild.data == 'true':
             nspin = 2
-
 
         # num of KS states
         nbnd_up, nbnd_dw, nbnd = -1, -1, -1
@@ -92,7 +100,8 @@ class QERead:
         np0v = int(fft_nodes[0].attributes['nr1'].value)
         np1v = int(fft_nodes[0].attributes['nr2'].value)
         np2v = int(fft_nodes[0].attributes['nr3'].value)
-        out_dict = {'nspin': nspin,
+        out_dict = {'cell': cell,
+                    'nspin': nspin,
                     'nks': nks,
                     'fermi': fermiEne,
                     'kweights': weights,

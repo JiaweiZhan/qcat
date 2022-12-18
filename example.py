@@ -2,7 +2,9 @@
 import argparse
 import os, shutil
 import signal
+import numpy as np
 from class_ldos import LDOS
+import qe_io
 import utils
 
 store = True
@@ -64,3 +66,9 @@ if __name__ == "__main__":
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
+
+    qe = qe_io.QERead()
+    xml_data = qe.parse_QE_XML(args.save_folder + '/data-file-schema.xml')
+    cell = xml_data['cell']
+    z_length = np.linalg.norm(cell[-1])
+    utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=z_length, picName='ldos.pdf')
