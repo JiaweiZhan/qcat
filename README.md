@@ -17,7 +17,7 @@ pyldos is a tool for computing [local density of states](https://en.wikipedia.or
 1. ssh to interactive session to utilize computing node (1 node is enough)
 2. Create a python file to call functions from **Library Files**
 ```python
-    from class_ldos import LDOS
+    import class_ldos
     import qe_io
     import utils
 
