@@ -28,12 +28,28 @@ def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
             if i % 5 == 4:
                 file_object.write('\n')
 
-def drawLocalBandEdge(lcbm, lvbm, z_length, picName='ldos.pdf'):
+def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
+    if kernel_size % 2 == 0:
+        kernel_size += 1
     fig, ax = plt.subplots(figsize=(10, 5))
     x_axis = np.linspace(0, z_length, len(lcbm))
     # smooth
-    lvbm_smooth = savgol_filter(lvbm, 11, 3)
-    lcbm_smooth = savgol_filter(lcbm, 11, 3)
+    # lvbm_smooth = savgol_filter(lvbm, 11, 3)
+    # lcbm_smooth = savgol_filter(lcbm, 11, 3)
+    lvbm = list(lvbm)
+    lcbm = list(lcbm)
+
+    kernel = np.ones(kernel_size) / kernel_size
+    lvbm_smooth = lvbm[-(kernel_size - 1)// 2:]
+    lvbm_smooth.extend(lvbm)
+    lvbm_smooth.extend(lvbm[:(kernel_size - 1) // 2 + 1])
+    lvbm_smooth = np.convolve(lvbm_smooth, kernel, mode='same')[(kernel_size - 1) // 2 + 1 : -(kernel_size - 1) // 2]
+
+    lcbm_smooth = lcbm[-(kernel_size - 1)// 2:]
+    lcbm_smooth.extend(lcbm)
+    lcbm_smooth.extend(lcbm[:(kernel_size - 1) // 2 + 1])
+    lcbm_smooth = np.convolve(lcbm_smooth, kernel, mode='same')[(kernel_size - 1) // 2 + 1 : -(kernel_size - 1) // 2]
+
     plt.plot(x_axis, lcbm_smooth, 'c')
     plt.plot(x_axis, lvbm_smooth, 'c')
     plt.xlabel('z axis / bohr', fontsize=15)

@@ -146,16 +146,6 @@ class LDOS:
     def computeLDOS(self):
         wfc_files = [self.saveFolder + '/' + file for file in os.listdir(self.saveFolder) if 'wfc' in file]
 
-        # xml_data = utils.parse_QE_XML(xml_file)
-        # # num of occupied bands
-        # nks = xml_data['nks']
-        # nspin = xml_data['nspin']
-        # utils.numOcc = xml_data['occ']   # [nspin * nks * nbnds]
-        # utils.kWeights = xml_data['kweights']
-        # utils.tot_bands = xml_data['nbnd']
-        # utils.eigens = xml_data['eigen'] # [nspin * nks * nbnds]
-        # fft_grid = xml_data['fftw']
-        # fft_grid = np.array(fft_grid) // 2 + 1
         qe = qe_io.QERead(numThread=self.numThread)
         xml_data = qe.parse_QE_XML(self.saveFolder + '/data-file-schema.xml')
         self.numOcc = xml_data['occ']
