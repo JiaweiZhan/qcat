@@ -1,6 +1,6 @@
 import numpy as np
 from tqdm import tqdm
-import os, time
+import os, time, pathlib
 import threading
 import qe_io
 import shutil
@@ -160,7 +160,11 @@ class LDOS:
 
         self.ksStateZAve = np.zeros((self.nspin, self.nks, self.nbnd, fft_grid[2]))
         for index in tqdm(range(self.nks * self.nspin), desc='read wfc'):
-            wfc_data = qe.parse_QE_wfc(wfc_files[index])
+            hdf5 = False
+            ext = pathlib.Path(wfc_files[index]).suffix
+            if ext == '.hdf5':
+                hdf5 = True
+            wfc_data = qe.parse_QE_wfc(wfc_files[index], hdf5=hdf5)
             ik = wfc_data['ik']
             ispin = wfc_data['ispin']
             # print(f"ik: {ik}, ispin: {ispin}, nbnd: {wfc_data['nbnd']}, npol: {wfc_data['npol']}, igwx: {wfc_data['igwx']}")

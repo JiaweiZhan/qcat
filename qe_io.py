@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import threading
 import os
+import h5py
 
 class QERead:
     storeIbndList = []
@@ -112,7 +113,7 @@ class QERead:
         self.xml_data = out_dict
         return out_dict 
 
-    def parse_QE_wfc(self, file_name):
+    def parse_QE_wfc(self, file_name, hdf5=False):
         """
         analyze QE wfc*.dat 
             param:
@@ -120,55 +121,74 @@ class QERead:
             return:
                  dict of {'ik', 'xk', 'ispin', 'nbnd', 'ngw', 'evc'...}
         """
-        with open(file_name, 'rb') as f:
-            # Moves the cursor 4 bytes to the right
-            f.seek(4)
+        wfc_dict = None
+        if not hdf5:
+            with open(file_name, 'rb') as f:
+                # Moves the cursor 4 bytes to the right
+                f.seek(4)
 
-            ik = np.fromfile(f, dtype='int32', count=1)[0]
-            xk = np.fromfile(f, dtype='float64', count=3)
-            ispin = np.fromfile(f, dtype='int32', count=1)[0]
-            gamma_only = bool(np.fromfile(f, dtype='int32', count=1)[0])
-            scalef = np.fromfile(f, dtype='float64', count=1)[0]
+                ik = np.fromfile(f, dtype='int32', count=1)[0]
+                xk = np.fromfile(f, dtype='float64', count=3)
+                ispin = np.fromfile(f, dtype='int32', count=1)[0]
+                gamma_only = bool(np.fromfile(f, dtype='int32', count=1)[0])
+                scalef = np.fromfile(f, dtype='float64', count=1)[0]
 
-            # Move the cursor 8 byte to the right
-            f.seek(8, 1)
-
-            ngw = np.fromfile(f, dtype='int32', count=1)[0]
-            igwx = np.fromfile(f, dtype='int32', count=1)[0]
-            npol = np.fromfile(f, dtype='int32', count=1)[0]
-            nbnd = np.fromfile(f, dtype='int32', count=1)[0]
-
-            # Move the cursor 8 byte to the right
-            f.seek(8, 1)
-
-            b1 = np.fromfile(f, dtype='float64', count=3)
-            b2 = np.fromfile(f, dtype='float64', count=3)
-            b3 = np.fromfile(f, dtype='float64', count=3)
-
-            f.seek(8,1)
-            
-            mill = np.fromfile(f, dtype='int32', count=3*igwx)
-            mill = mill.reshape( (igwx, 3) ) 
-
-            evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
-            f.seek(8,1)
-            # for i in tqdm(range(nbnd), desc='read wfc bands'):
-            for i in range(nbnd):
-                evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
+                # Move the cursor 8 byte to the right
                 f.seek(8, 1)
 
-            wfc_dict = {'ik': ik,
-                        'xk': xk,
-                        'ispin': ispin,
-                        'gamma_only': gamma_only,
-                        'scalef': scalef,
-                        'ngw': ngw,
-                        'igwx': igwx,
-                        'npol': npol,
-                        'nbnd': nbnd,
-                        'mill': mill,
-                        'b': [b1, b2, b3],
-                        'evc': evc}
+                ngw = np.fromfile(f, dtype='int32', count=1)[0]
+                igwx = np.fromfile(f, dtype='int32', count=1)[0]
+                npol = np.fromfile(f, dtype='int32', count=1)[0]
+                nbnd = np.fromfile(f, dtype='int32', count=1)[0]
+
+                # Move the cursor 8 byte to the right
+                f.seek(8, 1)
+
+                b1 = np.fromfile(f, dtype='float64', count=3)
+                b2 = np.fromfile(f, dtype='float64', count=3)
+                b3 = np.fromfile(f, dtype='float64', count=3)
+
+                f.seek(8,1)
+                
+                mill = np.fromfile(f, dtype='int32', count=3*igwx)
+                mill = mill.reshape( (igwx, 3) ) 
+
+                evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
+                f.seek(8,1)
+                # for i in tqdm(range(nbnd), desc='read wfc bands'):
+                for i in range(nbnd):
+                    evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
+                    f.seek(8, 1)
+                wfc_dict = {'ik': ik,
+                            'xk': xk,
+                            'ispin': ispin,
+                            'gamma_only': gamma_only,
+                            'scalef': scalef,
+                            'ngw': ngw,
+                            'igwx': igwx,
+                            'npol': npol,
+                            'nbnd': nbnd,
+                            'mill': mill,
+                            'b': [b1, b2, b3],
+                            'evc': evc}
+        else:
+            wfc_dict = {}
+            with h5py.File(file_name, 'r') as f:
+                for key, value in f.attrs.items():
+                    if key == "gamma_only":
+                        value = bool(value)
+                    wfc_dict[key] = value
+                for key, value in f.items():
+                    if key == "MillerIndices":
+                        wfc_dict['mill'] = value[()]
+                        b1 = value.attrs['bg1']
+                        b2 = value.attrs['bg2']
+                        b3 = value.attrs['bg3']
+                        wfc_dict['b'] = [b1, b2, b3]
+                    if key == "evc":
+                        evc = value[()]
+                        wfc_dict[key] = evc[:, 0::2] + 1j * evc[:, 1::2]
+
         self.wfc_data = wfc_dict
         return wfc_dict
 
@@ -235,6 +255,8 @@ class QERead:
                 thread_id.join()
             
             # TODO: multithread
+            # PERF: Fully Optimized
+
             # for ibnd in tqdm(range(wfc_data['nbnd']), desc='store ibnd'):
             #     evc_g = np.zeros([fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
             #     wfc_slice = list(wfc_data['evc'][ibnd, :])
@@ -286,3 +308,10 @@ class QERead:
     def info(self):
         qe_data = self.xml_data | self.xml_data
         return qe_data
+
+if __name__ == "__main__":
+    qe = QERead(15)
+    wfc_data = qe.parse_QE_wfc("../8bvo_6feooh_nspin2_hdf5.save/wfcdw1.hdf5", hdf5=True)
+    print(wfc_data['mill'].shape)
+    print(wfc_data['evc'].shape)
+    print(wfc_data['gamma_only'])

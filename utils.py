@@ -27,6 +27,7 @@ def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
             file_object.write(f'{lcbm[i]:12.5f}')
             if i % 5 == 4:
                 file_object.write('\n')
+    print(f"Local band edge is printed in {fileName}")
 
 def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
     if kernel_size % 2 == 0:
@@ -56,3 +57,4 @@ def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
     plt.ylabel('Energy Level / eV', fontsize=15)
     plt.xlim([0, z_length])
     plt.savefig(picName, dpi=1000, bbox_inches='tight')
+    print(f"Local band edge is drew on {picName}")
