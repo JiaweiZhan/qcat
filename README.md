@@ -14,6 +14,11 @@ pyldos is a tool for computing [local density of states](https://en.wikipedia.or
 * `utils.py` includes some useful functions to output/analyze local band edge
 
 ## How to use
+### Install Requirements
+```bash
+pip install -r requirements.txt
+```
+### Compute LDOS
 
 1. ssh to interactive session to utilize computing node (1 node is enough)
 2. Create a python file to call functions from **Library Files**
