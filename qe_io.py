@@ -306,7 +306,7 @@ class QERead:
                 np.save(storeFolder + '/' + wfcName, evc_r)
 
     def info(self):
-        qe_data = self.xml_data | self.xml_data
+        qe_data = self.xml_data | self.wfc_data
         return qe_data
 
 if __name__ == "__main__":
