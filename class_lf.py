@@ -100,7 +100,6 @@ if __name__=="__main__":
     lf.readWFC()
     wfc_data = lf.info()
     npv = wfc_data['npv']
-    print(npv)
 
     # read epsilon
     epsilon_file = '../RS_DDH_H/alpha.txt'
