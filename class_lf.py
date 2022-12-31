@@ -87,7 +87,7 @@ class LF:
                 lf = np.divide(upper, lower, out=np.zeros_like(upper), where=lower!=0)
                 fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
                 lfFile = open(fileName, 'wb')
-                lfFile.write(bytes(np.array(list(lf.shape))))
+                lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
                 lfFile.write(bytes(lf.flatten()))
                 lfFile.close()
         shutil.rmtree(storeFolder)
@@ -96,15 +96,15 @@ if __name__=="__main__":
     # get the start time
     st = time.time()
 
-    lf = LF("../gs_b.gs.xml")
+    lf = LF("../diamond.gs.xml")
     lf.readWFC()
     wfc_data = lf.info()
     npv = wfc_data['npv']
 
     # read epsilon
-    epsilon_file = '../RS_DDH_H/alpha.txt'
-    spread_domain = '../RS_DDH_H/spread_domain.txt'
-    domain_map = '../RS_DDH_H/domain_map.txt'
+    epsilon_file = '../alpha.txt'
+    spread_domain = '../spread_domain.txt'
+    domain_map = '../domain_map.txt'
     epsilon = np.zeros(npv)
     with open(epsilon_file, 'r') as file_obj:
         line = file_obj.readline()
