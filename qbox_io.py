@@ -2,6 +2,8 @@ from xml.dom import minidom
 import numpy as np
 import base64, os
 import utils
+import xml.sax
+from lxml import etree
 
 class QBOXRead:
     wfc_data = None
@@ -17,15 +19,15 @@ class QBOXRead:
             return:
                 dict of {'nbnd', 'fftw', 'nspin', 'evc'}
         """
-        file = minidom.parse(file_name)
+        tree = etree.parse(file_name)
+        elem = tree.getroot()
 
-        # cell parameter
-        cell_nodes = file.getElementsByTagName('unit_cell')
-        cellTag = ['a', 'b', 'c']
+        # cell and b
         cell = np.zeros((3, 3))
         b = np.zeros((3, 3))
-        for index, tag in enumerate(cellTag):
-            cell[index, :] = [float(num) for num in cell_nodes[0].attributes[tag].value.split()]
+        cell[0] = [float(num) for num in elem.xpath('//unit_cell/@a')[0].split()]
+        cell[1] = [float(num) for num in elem.xpath('//unit_cell/@b')[0].split()]
+        cell[2] = [float(num) for num in elem.xpath('//unit_cell/@c')[0].split()]
         volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
         fac = 2.0 * np.pi
         b[0] = fac / volume * np.cross(cell[1], cell[2])
@@ -33,22 +35,20 @@ class QBOXRead:
         b[2] = fac / volume * np.cross(cell[0], cell[1])
 
         # fftw parameter
-        grid_nodes = file.getElementsByTagName('grid')
-        fftwTag = ['nx', 'ny', 'nz']
         fftw = np.zeros(3, dtype=np.int32)
-        for index, tag in enumerate(fftwTag):
-            fftw[index] =  float(grid_nodes[0].attributes[tag].value)
+        fftw[0] = int(elem.xpath('//grid/@nx')[0]) 
+        fftw[1] = int(elem.xpath('//grid/@ny')[0]) 
+        fftw[2] = int(elem.xpath('//grid/@nz')[0]) 
 
         # nspin and states. kpoint = 1!
-        wfc_nodes = file.getElementsByTagName('wavefunction')
-        nspin = int(wfc_nodes[0].attributes['nspin'].value)
-        ecut = float(wfc_nodes[0].attributes['ecut'].value) * 2
-        nel = int(wfc_nodes[0].attributes['nel'].value)
-        nempty = int(wfc_nodes[0].attributes['nempty'].value)
+        nspin = int(elem.xpath('//wavefunction/@nspin')[0])
+        ecut = float(elem.xpath('//wavefunction/@ecut')[0]) * 2.0
+        nel = int(elem.xpath('//wavefunction/@nel')[0])
+        nempty = int(elem.xpath('//wavefunction/@nempty')[0])
 
-        # read wfc
-        slater_nodes = file.getElementsByTagName('slater_determinant')
-        nbnd = int(slater_nodes[0].attributes['size'].value)
+        # wfc and occ
+        nbnd = int(elem.xpath('//slater_determinant/@size')[0])
+        encoding = elem.xpath('//grid_function/@encoding')[0]
         dtype = np.double
         wfc = np.zeros((nspin, nbnd, *fftw), dtype=dtype)
         occ = np.zeros((nspin, nbnd), dtype=np.int32)
@@ -60,18 +60,21 @@ class QBOXRead:
             occ[0, :(nel + 1) // 2] = 1
             # spin down
             occ[1, :nel // 2] = 1
-        for ispin, node in enumerate(slater_nodes):
-            wfc_nodes = node.getElementsByTagName('grid_function')
-            for iwfc, wfc_node in enumerate(wfc_nodes):
-                encoding = wfc_node.attributes['encoding'].value
-                # wfc_r
-                if encoding.strip() == "text":
-                    wfc_flatten = np.fromstring(wfc_node.firstChild.data, dtype=dtype, sep=' ')
-                    wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
-                else:
-                    wfc_byte = base64.decodebytes(bytes(wfc_node.firstChild.data, 'utf-8'))
-                    wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
-                    wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
+        wfcs = elem.xpath('//grid_function/text()')
+        ispin, iwfc = 0, 0
+        for wfc_ in wfcs:
+            if encoding.strip() == "text":
+                wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
+                wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
+            else:
+                wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
+                wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
+                wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
+            iwfc = (iwfc + 1) % nbnd
+            if iwfc == 0:
+                ispin += 1
+
+        # npv
         fac = np.sqrt(4 * ecut) / 2.0 / np.pi
         hmax = int(1.5 + fac * np.linalg.norm(cell[0])) * 2
         kmax = int(1.5 + fac * np.linalg.norm(cell[1])) * 2
@@ -92,6 +95,7 @@ class QBOXRead:
             kmax += 2
         while utils.factorizable(lmax) is False:
             lmax += 2
+        npv = np.array([hmax, kmax, lmax])
 
         wfc_dict = {'cell': cell,
                     'b': b,
@@ -104,9 +108,10 @@ class QBOXRead:
                     'evc': wfc,
                     'occ': occ,
                     'fftw': fftw,
-                    'npv': np.array([hmax, kmax, lmax])}
+                    'npv': npv}
         self.wfc_data = wfc_dict
         return wfc_dict
+
 
     def storeWFC(self, realSpace=True, storeFolder='./wfc/'):
         """
@@ -130,16 +135,35 @@ class QBOXRead:
                     fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd + 1).zfill(5) + '_g'
                     evc_g = np.fft.fftn(self.wfc_data['evc'][ispin, ibnd], norm='forward')
                     np.save(fileName, evc_g)
+
+    def info(self):
+        print("----------------QBOX XML-------------------")
+        print(f"{'cell':^10}:")
+        print(self.wfc_data['cell'])
+        print('\n')
+        print(f"{'b':^10}:")
+        print(self.wfc_data['b'])
+        print('\n')
+        print(f"{'volume':^10}: {self.wfc_data['volume']:10.5f}")
+        print('\n')
+        print(f"{'occupation':^10}:")
+        print(self.wfc_data['occ'])
+        print('\n')
+        print(f"{'nbnd':^10}: {self.wfc_data['nbnd']:10.5f}")
+        print('\n')
+        print(f"{'nel':^10}: {self.wfc_data['nel']:10.5f}")
+        print('\n')
+        print(f"{'fftw':^10}:")
+        print(self.wfc_data['fftw'])
+        print('\n')
+        print(f"{'npv':^10}:")
+        print(self.wfc_data['npv'])
+        print("----------------QBOX XML-------------------")
+        return self.wfc_data
         
 
 if __name__ == "__main__":
     # test
     qbox = QBOXRead()
-    wfc_data = qbox.parse_QBOX_XML('../gs_b.gs.xml')
-    print(wfc_data['cell'])
-    print(wfc_data['b'])
-    print(wfc_data['volume'])
-    print(wfc_data['occ'])
-    print(wfc_data['nbnd'])
-    print(wfc_data['nel'])
-    print(wfc_data['npv'])
+    qbox.parse_QBOX_XML("../gs_b.gs.xml")
+    qbox.info()
