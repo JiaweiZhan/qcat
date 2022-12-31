@@ -58,3 +58,78 @@ def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
     plt.xlim([0, z_length])
     plt.savefig(picName, dpi=1000, bbox_inches='tight')
     print(f"Local band edge is drew on {picName}")
+
+def vint(fftw, cell):
+    """
+    fftw: [np0v, np1v, np2v]
+    cell: [[],[],[]]
+    """
+    b = np.zeros((3, 3))
+    volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
+    fac = 2.0 * np.pi
+    b[0] = fac / volume * np.cross(cell[1], cell[2])
+    b[1] = fac / volume * np.cross(cell[2], cell[0])
+    b[2] = fac / volume * np.cross(cell[0], cell[1])
+    G_vec_norm = np.zeros(fftw)
+    fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
+    for i in range(fftw[0]):
+        index_i = fftFreq[0][i]
+        for j in range(fftw[1]):
+            index_j = fftFreq[1][j]
+            for k in range(fftw[2]):
+                index_k = fftFreq[2][k]
+                G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
+                G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm
+    L_help = ((2.0 * np.pi) ** 3.0 / volume * 3.0 / 4.0 / np.pi) ** (1.0 / 3.0)
+    divergence = 16.0 * np.pi ** 2 / ((2.0 * np.pi) ** 3.0) * L_help
+    G_vec_norm[0, 0, 0] = divergence
+    return G_vec_norm
+
+def vint_erfc(fftw, cell, mu):
+    """
+    fftw: [np0v, np1v, np2v]
+    cell: [[],[],[]]
+    mu: 0.65
+    """
+    b = np.zeros((3, 3))
+    volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
+    fac = 2.0 * np.pi
+    b[0] = fac / volume * np.cross(cell[1], cell[2])
+    b[1] = fac / volume * np.cross(cell[2], cell[0])
+    b[2] = fac / volume * np.cross(cell[0], cell[1])
+    G_vec_norm = np.zeros(fftw)
+    fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
+    for i in range(fftw[0]):
+        index_i = fftFreq[0][i]
+        for j in range(fftw[1]):
+            index_j = fftFreq[1][j]
+            for k in range(fftw[2]):
+                index_k = fftFreq[2][k]
+                G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
+                G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm * (1.0 - np.exp(-G_vec_norm / 4.0 / mu ** 2))
+    divergence = 1.0 / 4.0 / mu ** 2 / volume * 4 * np.pi
+    G_vec_norm[0, 0, 0] = divergence
+    return G_vec_norm
+
+def factorizable(n):
+    if n % 11 == 0:
+        n /= 11
+    if n % 7 == 0:
+        n /= 7
+    if n % 5 == 0:
+        n /= 5
+    if n % 3 == 0:
+        n /= 3
+    if n % 3 == 0:
+        n /= 3
+    while n % 2 == 0:
+        n /= 2
+    return n == 1
+
+if __name__ == "__main__":
+    n = 68
+    while factorizable(n) is False:
+        n += 2
+    print(n)
