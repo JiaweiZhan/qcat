@@ -88,10 +88,10 @@ class LF:
                     upper += wfc_j * np.sqrt(1.0 - 1.0 / epsilon) * sumPar * occ[ispin, ibnd_j]
                     upper += wfc_j * np.sqrt(1.0 / epsilon) * np.real(np.fft.ifftn(v_g * wfc_ijeps_g, norm='forward')) * occ[ispin, ibnd_j]
                 lf = np.divide(upper, lower, out=np.zeros_like(upper), where=lower!=0)
-                # lf_low = np.percentile(lf, 5)
-                # lf_high = np.percentile(lf, 95)
-                # lf = np.where(lf >= lf_low, lf, lf_low)
-                # lf = np.where(lf <= lf_high, lf, lf_high)
+                lf_low = np.percentile(lf, 5)
+                lf_high = np.percentile(lf, 95)
+                lf = np.where(lf >= lf_low, lf, lf_low)
+                lf = np.where(lf <= lf_high, lf, lf_high)
                 fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
                 lfFile = open(fileName, 'wb')
                 lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
