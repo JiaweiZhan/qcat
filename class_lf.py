@@ -119,6 +119,8 @@ if __name__=="__main__":
         while line:
             epsilon[:, :, index_line] = np.fromstring(line, sep=' ').reshape([npv[0], npv[1]])
             line = file_obj.readline()
+            index_line += 1
+    assert(np.all(epsilon >= 1))
     mus = None
     with open(spread_domain, 'r') as file_obj:
         file_obj.readline()
