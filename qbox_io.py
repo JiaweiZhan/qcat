@@ -166,4 +166,14 @@ if __name__ == "__main__":
     # test
     qbox = QBOXRead()
     qbox.parse_QBOX_XML("../gs_b.gs.xml")
-    qbox.info()
+    wfc_data = qbox.info()
+    wfc = wfc_data['evc']
+    fftw = wfc_data['fftw']
+    occ = wfc_data['occ']
+    rho = np.zeros(fftw)
+    for ispin in range(wfc.shape[0]):
+        for iwfc in range(wfc.shape[1]):
+            rho += np.absolute(wfc[ispin, iwfc]) ** 2 * occ[ispin, iwfc]
+            if occ[ispin, iwfc] > 0:
+                print(f"max_index: {np.unravel_index(np.argmax(np.absolute(wfc[ispin, iwfc]) ** 2, axis=None), rho.shape)}")
+    print(f"max_index: {np.unravel_index(np.argmax(rho, axis=None), rho.shape)}")

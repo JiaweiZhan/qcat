@@ -40,11 +40,11 @@ class LF:
         # scale epsilon
         epsilon = np.zeros(fftw)
         for i in range(fftw[0]):
-            floorIndexI = int(i * 1.0 / fftw[0] * mu_map.shape[0])
+            floorIndexI = int(i * 1.0 / fftw[0] * epsilonPre.shape[0])
             for j in range(fftw[1]):
-                floorIndexJ = int(j * 1.0 / fftw[1] * mu_map.shape[1])
+                floorIndexJ = int(j * 1.0 / fftw[1] * epsilonPre.shape[1])
                 for k in range(fftw[2]):
-                    floorIndexK = int(k * 1.0 / fftw[2] * mu_map.shape[2])
+                    floorIndexK = int(k * 1.0 / fftw[2] * epsilonPre.shape[2])
                     epsilon[i, j, k] = epsilonPre[floorIndexI, floorIndexJ, floorIndexK]
 
         # prepare mu and floorFunc
@@ -97,13 +97,14 @@ class LF:
                 lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
                 lfFile.write(bytes(lf.flatten()))
                 lfFile.close()
+
         shutil.rmtree(storeFolder)
 
 if __name__=="__main__":
     # get the start time
     st = time.time()
 
-    lf = LF("../diamond.gs.xml")
+    lf = LF("../../gs.gs.xml")
     lf.readWFC()
     wfc_data = lf.info()
     npv = wfc_data['npv']
