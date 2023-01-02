@@ -8,6 +8,7 @@ import threading
 import qbox_io
 import utils
 import shutil
+from scipy.ndimage import gaussian_filter
 
 class LF:
     # thread-related global value
@@ -92,6 +93,7 @@ class LF:
                 lf_high = np.percentile(lf, 95)
                 lf = np.where(lf >= lf_low, lf, lf_low)
                 lf = np.where(lf <= lf_high, lf, lf_high)
+                # lf = gaussian_filter(lf, sigma=1, mode='wrap')
                 fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
                 lfFile = open(fileName, 'wb')
                 lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
@@ -104,7 +106,7 @@ if __name__=="__main__":
     # get the start time
     st = time.time()
 
-    lf = LF("../../gs.gs.xml")
+    lf = LF("../diamond.gs.xml")
     lf.readWFC()
     wfc_data = lf.info()
     npv = wfc_data['npv']
