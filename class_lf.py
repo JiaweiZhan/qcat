@@ -80,66 +80,35 @@ class LF:
         comm.Barrier()
         for ispin in range(nspin):
             # TODO: Possible multithread here
-            if rank == 0:
-                for ibnd_i in tqdm(range(nbnd), desc='compute lf'): 
-                    if ibnd_i % size == rank:
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
-                        wfc_i = np.load(fileName)
-                        upper, lower = np.zeros(fftw), np.zeros(fftw)
-                        for ibnd_j in range(nbnd): 
-                            fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
-                            wfc_j = np.load(fileName)
-                            wfc_ij = wfc_i * wfc_j
-                            wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
-                            wfc_ijeps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 / epsilon), norm='forward') 
-                            wfc_ij1meps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 - 1.0 / epsilon), norm='forward') 
-                            lower += wfc_j * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j]
-                            sumPar = np.zeros(fftw)
-                            for index_mu in range(mus.shape[0]):
-                                sumPar += np.real(np.fft.ifftn(v_g_mu[index_mu] * wfc_ij1meps_g, norm='forward')) * floorFunc[index_mu]
-                            upper += wfc_j * np.sqrt(1.0 - 1.0 / epsilon) * sumPar * occ[ispin, ibnd_j]
-                            upper += wfc_j * np.sqrt(1.0 / epsilon) * np.real(np.fft.ifftn(v_g * wfc_ijeps_g, norm='forward')) * occ[ispin, ibnd_j]
-                        lf = np.divide(upper, lower, out=np.zeros_like(upper), where=lower!=0)
-                        lf_low = np.percentile(lf, 5)
-                        lf_high = np.percentile(lf, 95)
-                        lf = np.where(lf >= lf_low, lf, lf_low)
-                        lf = np.where(lf <= lf_high, lf, lf_high)
-                        # lf = gaussian_filter(lf, sigma=1, mode='wrap')
-                        fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
-                        lfFile = open(fileName, 'wb')
-                        lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
-                        lfFile.write(bytes(lf.flatten()))
-                        lfFile.close()
-            else:
-                for ibnd_i in range(nbnd): 
-                    if ibnd_i % size == rank:
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
-                        wfc_i = np.load(fileName)
-                        upper, lower = np.zeros(fftw), np.zeros(fftw)
-                        for ibnd_j in range(nbnd): 
-                            fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
-                            wfc_j = np.load(fileName)
-                            wfc_ij = wfc_i * wfc_j
-                            wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
-                            wfc_ijeps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 / epsilon), norm='forward') 
-                            wfc_ij1meps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 - 1.0 / epsilon), norm='forward') 
-                            lower += wfc_j * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j]
-                            sumPar = np.zeros(fftw)
-                            for index_mu in range(mus.shape[0]):
-                                sumPar += np.real(np.fft.ifftn(v_g_mu[index_mu] * wfc_ij1meps_g, norm='forward')) * floorFunc[index_mu]
-                            upper += wfc_j * np.sqrt(1.0 - 1.0 / epsilon) * sumPar * occ[ispin, ibnd_j]
-                            upper += wfc_j * np.sqrt(1.0 / epsilon) * np.real(np.fft.ifftn(v_g * wfc_ijeps_g, norm='forward')) * occ[ispin, ibnd_j]
-                        lf = np.divide(upper, lower, out=np.zeros_like(upper), where=lower!=0)
-                        lf_low = np.percentile(lf, 5)
-                        lf_high = np.percentile(lf, 95)
-                        lf = np.where(lf >= lf_low, lf, lf_low)
-                        lf = np.where(lf <= lf_high, lf, lf_high)
-                        # lf = gaussian_filter(lf, sigma=1, mode='wrap')
-                        fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
-                        lfFile = open(fileName, 'wb')
-                        lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
-                        lfFile.write(bytes(lf.flatten()))
-                        lfFile.close()
+            for ibnd_i in range(nbnd): 
+                if ibnd_i % size == rank:
+                    fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
+                    wfc_i = np.load(fileName)
+                    upper, lower = np.zeros(fftw), np.zeros(fftw)
+                    for ibnd_j in range(nbnd): 
+                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
+                        wfc_j = np.load(fileName)
+                        wfc_ij = wfc_i * wfc_j
+                        wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
+                        wfc_ijeps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 / epsilon), norm='forward') 
+                        wfc_ij1meps_g = np.fft.fftn(wfc_ij * np.sqrt(1.0 - 1.0 / epsilon), norm='forward') 
+                        lower += wfc_j * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j]
+                        sumPar = np.zeros(fftw)
+                        for index_mu in range(mus.shape[0]):
+                            sumPar += np.real(np.fft.ifftn(v_g_mu[index_mu] * wfc_ij1meps_g, norm='forward')) * floorFunc[index_mu]
+                        upper += wfc_j * np.sqrt(1.0 - 1.0 / epsilon) * sumPar * occ[ispin, ibnd_j]
+                        upper += wfc_j * np.sqrt(1.0 / epsilon) * np.real(np.fft.ifftn(v_g * wfc_ijeps_g, norm='forward')) * occ[ispin, ibnd_j]
+                    lf = np.divide(upper, lower, out=np.zeros_like(upper), where=lower!=0)
+                    lf_low = np.percentile(lf, 5)
+                    lf_high = np.percentile(lf, 95)
+                    lf = np.where(lf >= lf_low, lf, lf_low)
+                    lf = np.where(lf <= lf_high, lf, lf_high)
+                    # lf = gaussian_filter(lf, sigma=1, mode='wrap')
+                    fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
+                    lfFile = open(fileName, 'wb')
+                    lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
+                    lfFile.write(bytes(lf.flatten()))
+                    lfFile.close()
 
         comm.Barrier()
         if rank == 0:
@@ -150,7 +119,6 @@ if __name__=="__main__":
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    print(f"rank: {rank:^5}, size: {size:^5}")
     st = time.time()
 
     lf = LF("../diamond.gs.xml")

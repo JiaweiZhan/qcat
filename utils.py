@@ -80,6 +80,7 @@ def vint(fftw, cell):
                 index_k = fftFreq[2][k]
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm[0, 0, 0] = 1
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm
     L_help = ((2.0 * np.pi) ** 3.0 / volume * 3.0 / 4.0 / np.pi) ** (1.0 / 3.0)
     divergence = 16.0 * np.pi ** 2 / ((2.0 * np.pi) ** 3.0) * L_help
@@ -108,6 +109,7 @@ def vint_erfc(fftw, cell, mu):
                 index_k = fftFreq[2][k]
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm[0, 0, 0] = 1
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm * (1.0 - np.exp(-G_vec_norm / 4.0 / mu ** 2))
     divergence = 1.0 / 4.0 / mu ** 2 / volume * 4 * np.pi
     G_vec_norm[0, 0, 0] = divergence
