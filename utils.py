@@ -6,7 +6,7 @@ from scipy.signal import savgol_filter
 def time_now():
     now = datetime.datetime.now()
     print("=====================================================")
-    print("*              QE LDOS from wfc.dat                  ")
+    print("*               QE/Qbox Analyzer                     ")
     print("*   Developed by Jiawei Zhan <jiaweiz@uchicago.edu>  ")
     print("*  Supported by Galli Group @ University of Chicago  ")
     print("* -- ")
@@ -129,6 +129,26 @@ def factorizable(n):
     while n % 2 == 0:
         n /= 2
     return n == 1
+
+def increase(wfc, fftw, npv, real=True,):
+    fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
+    pos_a = np.sum(np.array(fftFreq[0]) >= 0)
+    pos_b = np.sum(np.array(fftFreq[1]) >= 0)
+    pos_c = np.sum(np.array(fftFreq[2]) >= 0)
+    wfc_g = np.fft.fftn(wfc, norm='forward')
+    wfc_g_b = np.zeros(npv, dtype=wfc_g.dtype)
+    wfc_g_b[:pos_a, :pos_b, :pos_c] = wfc_g[:pos_a, :pos_b, :pos_c]
+    wfc_g_b[fftFreq[0][pos_a]:, :pos_b, :pos_c] = wfc_g[fftFreq[0][pos_a]:, :pos_b, :pos_c]
+    wfc_g_b[:pos_a, fftFreq[1][pos_b]:, :pos_c] = wfc_g[:pos_a, fftFreq[1][pos_b]:, :pos_c]
+    wfc_g_b[:pos_a, :pos_b, fftFreq[2][pos_c]:] = wfc_g[:pos_a, :pos_b, fftFreq[2][pos_c]:]
+    wfc_g_b[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, :pos_c] = wfc_g[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, :pos_c]
+    wfc_g_b[fftFreq[0][pos_a]:, :pos_b, fftFreq[2][pos_c]:] = wfc_g[fftFreq[0][pos_a]:, :pos_b, fftFreq[2][pos_c]:]
+    wfc_g_b[:pos_a, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:] = wfc_g[:pos_a, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:]
+    wfc_g_b[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:] = wfc_g[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:]
+    if not real:
+        return wfc_g_b
+    else:
+        return np.fft.ifftn(wfc_g_b, norm='forward')
 
 if __name__ == "__main__":
     n = 68

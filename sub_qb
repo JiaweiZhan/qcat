@@ -12,4 +12,5 @@
 
 NTASKS=$(($SLURM_NTASKS_PER_NODE * $SLURM_JOB_NUM_NODES))
 
-mpirun -np ${NTASKS} python3 -u class_lf.py
+python3 -u ./qbox_io.py
+mpirun -np ${NTASKS} python3 -u ./class_lf.py
