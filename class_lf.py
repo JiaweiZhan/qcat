@@ -99,9 +99,9 @@ class LF:
                     lf = zoom(lf, npv / fftw, mode='wrap', prefilter=False)
                     fileName = lfFolder + '/lf_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '.dat'
                     lfFile = open(fileName, 'wb')
-                    print(lf.shape)
                     lfFile.write(bytes(np.array(list(lf.shape), dtype=np.int32)))
-                    lfFile.write(bytes(lf.flatten()))
+                    for k in range(lf.shape[-1]):
+                        lfFile.write(bytes(lf[:, :, k].flatten()))
                     lfFile.close()
 
         if not comm is None:
