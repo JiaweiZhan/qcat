@@ -22,7 +22,8 @@ class QBOXRead:
             return:
                 dict of {'nbnd', 'fftw', 'nspin', 'evc'}
         """
-        tree = etree.parse(file_name)
+        parser = etree.XMLParser(huge_tree=True)
+        tree = etree.parse(file_name, parser)
         elem = tree.getroot()
 
         # cell and b

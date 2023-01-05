@@ -27,7 +27,7 @@ class LF:
     def info(self):
         return self.xml_data
 
-    def computeLF(self, epsilonPre, mus, mu_map, sigma=20, wfc_folder='./wfc/', comm=None):
+    def computeLF(self, epsilonPre, mus, mu_map, sigma=40, wfc_folder='./wfc/', comm=None):
         cell = self.xml_data['cell']
         nspin = self.xml_data['nspin']
         fftw = self.xml_data['fftw']
@@ -136,7 +136,7 @@ if __name__=="__main__":
     if not args.LocaFunctionFolder:
         args.LocaFunctionFolder = "../"
     if not args.Sigma:
-        args.Sigma = 20 
+        args.Sigma = 40 
 
     if rank == 0:
         print(f"configure:\

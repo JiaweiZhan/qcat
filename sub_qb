@@ -11,6 +11,6 @@
 
 NTASKS=$(($SLURM_NTASKS_PER_NODE * $SLURM_JOB_NUM_NODES))
 
-python3 -u ./qbox_io.py -x ../diamond.gs.xml
-mpirun -np $NTASKS python3 -u ./class_lf.py -x ../diamond.gs.xml -s 20
+python3 -u ./qbox_io.py -x ../si35h36.gs.xml
+mpirun -np $NTASKS python3 -u ./class_lf.py -x ../si35h36.gs.xml -l ../ -s 40
 rm rcc-*
