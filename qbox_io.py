@@ -186,6 +186,13 @@ if __name__ == "__main__":
         args.xml = "../gs.gs.xml"
     if not args.storeFolder:
         args.storeFolder = "./wfc/"
+    print(f"configure:\
+            \n {''.join(['-'] * 41)}\
+            \n{'Qbox sample file':^20}:{args.xml:^20}\
+            \n{'wfc storeFolder':^20}:{args.storeFolder:^20}\
+            \n {''.join(['-'] * 41)}\n\
+            ")
+    # ---------------------------------Parse Qbox xml------------------------------------
     # test
     st = time.time()
 
