@@ -2,6 +2,10 @@ import datetime
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.signal import savgol_filter
+from mpi4py import MPI
+import pickle
+from tqdm import tqdm
+from qbox_io import QBOXRead
 
 def time_now():
     now = datetime.datetime.now()
@@ -130,25 +134,62 @@ def factorizable(n):
         n /= 2
     return n == 1
 
-def increase(wfc, fftw, npv, real=True,):
-    fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
-    pos_a = np.sum(np.array(fftFreq[0]) >= 0)
-    pos_b = np.sum(np.array(fftFreq[1]) >= 0)
-    pos_c = np.sum(np.array(fftFreq[2]) >= 0)
-    wfc_g = np.fft.fftn(wfc, norm='forward')
-    wfc_g_b = np.zeros(npv, dtype=wfc_g.dtype)
-    wfc_g_b[:pos_a, :pos_b, :pos_c] = wfc_g[:pos_a, :pos_b, :pos_c]
-    wfc_g_b[fftFreq[0][pos_a]:, :pos_b, :pos_c] = wfc_g[fftFreq[0][pos_a]:, :pos_b, :pos_c]
-    wfc_g_b[:pos_a, fftFreq[1][pos_b]:, :pos_c] = wfc_g[:pos_a, fftFreq[1][pos_b]:, :pos_c]
-    wfc_g_b[:pos_a, :pos_b, fftFreq[2][pos_c]:] = wfc_g[:pos_a, :pos_b, fftFreq[2][pos_c]:]
-    wfc_g_b[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, :pos_c] = wfc_g[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, :pos_c]
-    wfc_g_b[fftFreq[0][pos_a]:, :pos_b, fftFreq[2][pos_c]:] = wfc_g[fftFreq[0][pos_a]:, :pos_b, fftFreq[2][pos_c]:]
-    wfc_g_b[:pos_a, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:] = wfc_g[:pos_a, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:]
-    wfc_g_b[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:] = wfc_g[fftFreq[0][pos_a]:, fftFreq[1][pos_b]:, fftFreq[2][pos_c]:]
-    if not real:
-        return wfc_g_b
-    else:
-        return np.fft.ifftn(wfc_g_b, norm='forward')
+def local_contribution(xml, comm, storeFolder='./wfc/'):
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    qbox = QBOXRead()
+    qbox.parse_QBOX_XML(xml, comm=comm, storeFolder=storeFolder)
+
+    comm.Barrier()
+    with open(storeFolder + '/qbox.pickle', 'rb') as handle:
+        xml_data = pickle.load(handle)
+
+    if rank == 0:
+        print("store wfc done!")
+
+    nbnd = xml_data['nbnd']
+    nspin = xml_data['nspin']
+    cell = xml_data['cell']
+    fftw = xml_data['fftw']
+    occ = xml_data['occ']
+
+    v_g = vint(fftw, cell)
+    v_g_mu = vint_erfc(fftw, cell, mu=0.71)
+
+    lower_chunk, upper_chunk = 0, 0
+    for ispin in range(nspin):
+        if rank == 0:
+            total_iter = nbnd[ispin]
+            pbar = tqdm(desc=f'compute local contri. for {ispin + 1}', total=total_iter)
+        for ibnd_i in range(nbnd[ispin]): 
+            if ibnd_i % size == rank:
+                fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
+                wfc_i = np.load(fileName)
+                for ibnd_j in range(ibnd_i, nbnd[ispin]): 
+                    fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
+                    wfc_j = np.load(fileName)
+                    wfc_ij = wfc_i * wfc_j
+                    wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
+                    factor = 1.0
+                    if ibnd_i != ibnd_j:
+                        factor = 2.0
+                    lower_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j] * occ[ispin, ibnd_i] )
+                    upper_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g_mu * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j] * occ[ispin, ibnd_i] )
+                if rank == 0:
+                    value = size
+                    if nbnd[ispin] - ibnd_i < value:
+                        value = nbnd[ispin] - ibnd_i
+                    pbar.update(value)
+        if rank == 0:
+            pbar.close()
+
+
+    lower = comm.allreduce(lower_chunk, op=MPI.SUM)
+    upper = comm.allreduce(upper_chunk, op=MPI.SUM)
+
+    if rank == 0:
+        print(f"upper / lower: {upper/lower:5.3f}")
+
 
 if __name__ == "__main__":
     n = 68

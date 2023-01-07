@@ -73,12 +73,12 @@ class LF:
             comm.Barrier()
         for ispin in range(nspin):
             # TODO: Possible multithread here
-            for ibnd_i in range(nbnd): 
+            for ibnd_i in range(nbnd[ispin]): 
                 if ibnd_i % size == rank:
                     fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
                     wfc_i = np.load(fileName)
                     upper, lower = np.zeros(fftw), np.zeros(fftw)
-                    for ibnd_j in range(nbnd): 
+                    for ibnd_j in range(nbnd[ispin]): 
                         fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
                         wfc_j = np.load(fileName)
                         wfc_ij = wfc_i * wfc_j

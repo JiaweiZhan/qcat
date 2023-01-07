@@ -7,6 +7,8 @@ from lxml import etree
 from mpi4py import MPI
 import shutil
 import pickle
+from mpi4py import MPI
+from tqdm import tqdm
 
 class QBOXRead:
     wfc_data = None
@@ -14,7 +16,7 @@ class QBOXRead:
     def __init__(self):
         pass
 
-    def parse_QBOX_XML(self, file_name):
+    def parse_QBOX_XML(self, file_name, comm, storeFolder='./wfc/'):
         """
         analyze qbox sample xml files 
             param:
@@ -22,61 +24,100 @@ class QBOXRead:
             return:
                 dict of {'nbnd', 'fftw', 'nspin', 'evc'}
         """
-        parser = etree.XMLParser(huge_tree=True)
-        tree = etree.parse(file_name, parser)
-        elem = tree.getroot()
+        size = comm.Get_size()
+        rank = comm.Get_rank()
+        if rank == 0:
+            isExist = os.path.exists(storeFolder)
+            if not isExist:
+                # Create a new directory because it does not exist
+                os.makedirs(storeFolder)
+        comm.Barrier()
 
-        # cell and b
+        context = etree.iterparse(file_name, huge_tree=True, events=('start', 'end'))
+
+        ispin, iwfc = 0, 0
         cell = np.zeros((3, 3))
         b = np.zeros((3, 3))
-        cell[0] = [float(num) for num in elem.xpath('//unit_cell/@a')[0].split()]
-        cell[1] = [float(num) for num in elem.xpath('//unit_cell/@b')[0].split()]
-        cell[2] = [float(num) for num in elem.xpath('//unit_cell/@c')[0].split()]
-        volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
-        fac = 2.0 * np.pi
-        b[0] = fac / volume * np.cross(cell[1], cell[2])
-        b[1] = fac / volume * np.cross(cell[2], cell[0])
-        b[2] = fac / volume * np.cross(cell[0], cell[1])
-
-        # fftw parameter
         fftw = np.zeros(3, dtype=np.int32)
-        fftw[0] = int(elem.xpath('//grid/@nx')[0]) 
-        fftw[1] = int(elem.xpath('//grid/@ny')[0]) 
-        fftw[2] = int(elem.xpath('//grid/@nz')[0]) 
+        volume = 0
+        nspin, ecut, nel, nempty, nbnd = 0, 0, 0, 0, None
+        occ = None
+        encoding = "text"
 
-        # nspin and states. kpoint = 1!
-        nspin = int(elem.xpath('//wavefunction/@nspin')[0])
-        ecut = float(elem.xpath('//wavefunction/@ecut')[0]) * 2.0
-        nel = int(elem.xpath('//wavefunction/@nel')[0])
-        nempty = int(elem.xpath('//wavefunction/@nempty')[0])
+        # several necessary configuration
+        for event, element in context:
+            if element.tag == "grid_function":
+                break
+            if element.tag == "unit_cell" and event == 'start':
+                cell[0] = [float(num) for num in element.get("a").split()]
+                cell[1] = [float(num) for num in element.get("b").split()]
+                cell[2] = [float(num) for num in element.get("c").split()]
+                volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
+                fac = 2.0 * np.pi
+                b[0] = fac / volume * np.cross(cell[1], cell[2])
+                b[1] = fac / volume * np.cross(cell[2], cell[0])
+                b[2] = fac / volume * np.cross(cell[0], cell[1])
+            elif element.tag == "grid" and event == 'start':
+                fftw[0] = int(element.get("nx")) 
+                fftw[1] = int(element.get("ny")) 
+                fftw[2] = int(element.get("nz")) 
+            elif element.tag == "wavefunction" and event == 'start':
+                nspin = int(element.get("nspin"))
+                ecut = float(element.get("ecut")) * 2.0
+                nel = int(element.get("nel"))
+                nempty = int(element.get("nempty"))
 
-        # wfc and occ
-        nbnd = int(elem.xpath('//slater_determinant/@size')[0])
-        encoding = elem.xpath('//grid_function/@encoding')[0]
-        dtype = np.double
-        wfc = np.zeros((nspin, nbnd, *fftw), dtype=dtype)
-        occ = np.zeros((nspin, nbnd), dtype=np.int32)
-        if nspin == 1:
-            occ[nspin - 1, :nel // 2] = 2
-            occ[nspin - 1, nel // 2: nel // 2 + nel % 2] = 1
-        else:
-            # spin up
-            occ[0, :(nel + 1) // 2] = 1
-            # spin down
-            occ[1, :nel // 2] = 1
-        wfcs = elem.xpath('//grid_function/text()')
-        ispin, iwfc = 0, 0
-        for wfc_ in wfcs:
-            if encoding.strip() == "text":
-                wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
-                wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
-            else:
-                wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
-                wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
-                wfc[ispin, iwfc, :, :, :] = wfc_flatten.reshape(fftw)
-            iwfc = (iwfc + 1) % nbnd
-            if iwfc == 0:
-                ispin += 1
+                nbnd = np.zeros(nspin, dtype=np.int32)
+                if nspin == 1:
+                    nbnd[0] = (nel + 1) // 2 + nempty
+                else:
+                    nbnd[0] = (nel + 1) // 2 + nempty
+                    nbnd[1] = (nel) // 2 + nempty
+
+                occ = np.zeros((nspin, max(nbnd)), dtype=np.int32)
+                if nspin == 1:
+                    occ[nspin - 1, :nel // 2] = 2
+                    occ[nspin - 1, nel // 2: nel // 2 + nel % 2] = 1
+                else:
+                    # spin up
+                    occ[0, :(nel + 1) // 2] = 1
+                    # spin down
+                    occ[1, :nel // 2] = 1
+            element.clear()
+
+        context = etree.iterparse(file_name, huge_tree=True)
+
+        index_mp = 0
+        if rank == 0:
+            total_iter = np.sum(nbnd)
+            pbar = tqdm(desc='store wfc', total=total_iter)
+        for event, element in context:
+            if element.tag == "grid_function":
+                encoding = element.get("encoding")
+                if index_mp % size == rank:
+                    wfc_ = element.text
+                    dtype = np.double
+                    if encoding.strip() == "text":
+                        wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
+                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                        np.save(fileName, wfc_flatten.reshape(fftw))
+                    else:
+                        wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
+                        wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
+                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                        np.save(fileName, wfc_flatten.reshape(fftw))
+                    if rank == 0:
+                        value = size
+                        if total_iter - index_mp < value:
+                            value = total_iter - index_mp 
+                        pbar.update(value)
+                iwfc = (iwfc + 1) % nbnd[ispin]
+                if iwfc == 0:
+                    ispin += 1
+                index_mp += 1
+            element.clear()
+        if rank == 0:
+            pbar.close()
 
         # npv
         fac = np.sqrt(4 * ecut) / 2.0 / np.pi
@@ -109,12 +150,15 @@ class QBOXRead:
                     'nbnd': nbnd,
                     'nel': nel,
                     'nempty': nempty,
-                    'evc': wfc,
                     'occ': occ,
                     'fftw': fftw,
                     'npv': npv}
         self.wfc_data = wfc_dict
+        if rank == 0:
+            with open(storeFolder + '/qbox.pickle', 'wb') as handle:
+                pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         return wfc_dict
+
 
 
     def storeWFC(self, realSpace=True, store=True, storeFolder='./wfc/'):
@@ -173,7 +217,13 @@ class QBOXRead:
 
 if __name__ == "__main__":
     # ----------------------------------Prepare------------------------------------
-    utils.time_now()
+
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    if rank == 0:
+        utils.time_now()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-x", "--xml", type=str,
@@ -187,23 +237,25 @@ if __name__ == "__main__":
         args.xml = "../gs.gs.xml"
     if not args.storeFolder:
         args.storeFolder = "./wfc/"
-    print(f"configure:\
-            \n {''.join(['-'] * 41)}\
-            \n{'Qbox sample file':^20}:{args.xml:^20}\
-            \n{'wfc storeFolder':^20}:{args.storeFolder:^20}\
-            \n {''.join(['-'] * 41)}\n\
-            ")
+    if rank == 0:
+        print(f"configure:\
+                \n {''.join(['-'] * 41)}\
+                \n{'Qbox sample file':^20}:{args.xml:^20}\
+                \n{'wfc storeFolder':^20}:{args.storeFolder:^20}\
+                \n {''.join(['-'] * 41)}\n\
+                ")
     # ---------------------------------Parse Qbox xml------------------------------------
     # test
     st = time.time()
 
     qbox = QBOXRead()
-    qbox.parse_QBOX_XML(args.xml)
-    qbox.storeWFC(storeFolder=args.storeFolder)
+    qbox.parse_QBOX_XML(args.xml, comm=comm)
 
     # get the end time
     et = time.time()
 
     # get the execution time
     elapsed_time = et - st
-    print('Execution time:', elapsed_time, 'seconds')
+    comm.Barrier()
+    if rank == 0:
+        print('Execution time:', elapsed_time, 'seconds')
