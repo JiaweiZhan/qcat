@@ -4,6 +4,7 @@ from tqdm import tqdm
 import threading
 import os
 import h5py
+import time
 
 class QERead:
     storeIbndList = []
@@ -310,8 +311,20 @@ class QERead:
         return qe_data
 
 if __name__ == "__main__":
+    # test
+    st = time.time()
+
     qe = QERead(15)
-    wfc_data = qe.parse_QE_wfc("../8bvo_6feooh_nspin2_hdf5.save/wfcdw1.hdf5", hdf5=True)
+    qe.parse_QE_XML("../bn.save/data-file-schema.xml")
+    wfc_data = qe.parse_QE_wfc("../bn.save/wfc1.dat")
+    qe.computeWFC(Store=True, storeFolder="./wfc/")
     print(wfc_data['mill'].shape)
     print(wfc_data['evc'].shape)
     print(wfc_data['gamma_only'])
+
+    # get the end time
+    et = time.time()
+
+    # get the execution time
+    elapsed_time = et - st
+    print('Execution time:', elapsed_time, 'seconds')
