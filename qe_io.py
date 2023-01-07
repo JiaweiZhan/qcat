@@ -12,7 +12,6 @@ class QERead:
 
     def __init__(self, comm=None):
         self.xml_data = None
-        self.wfc_data = None
         self.comm = comm
 
     def parse_QE_XML(self, file_name, storeFolder='./wfc/'):
@@ -206,7 +205,7 @@ class QERead:
                 displ = np.array([sum(count[:p]) for p in range(size)])
 
                 recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
-                comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+                self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
 
                 fftw = self.xml_data['fftw']
                 fft_grid = np.array(fftw) // 2 + 1
@@ -226,6 +225,7 @@ class QERead:
                         pbar.update(value)
                 if rank == 0:
                     pbar.close()
+            return wfc_dict
 
         else:
             wfc_dict = {}
@@ -244,126 +244,29 @@ class QERead:
                     if key == "evc":
                         evc = value[()]
                         evc = evc[:, 0::2] + 1j * evc[:, 1::2]
-
-        self.wfc_data = wfc_dict
-        return wfc_dict
-
-    def computeWFC(self, realSpace=True, Store=False, storeFolder=None):
-        """
-        Compute wavefunction in a multi-threaded way
-        by either storing wfc in memory or disk
-        param:
-            xml_data: return of parse_QE_XML
-            wfc_data: return of parse_QE_wfc
-            realSpace: bool, whether convert wfc to real space
-            Store: bool, whether store wfc on disk to save memory
-            storeFolder: str, whether the wfc is strored
-            threadNum: number of thread to store wfc
-        """
-        fft_grid = self.xml_data['fftw']
-        fft_grid = np.array(fft_grid) // 2 + 1
-        if not Store:
-            # store everyting in memory
-            evc_g = np.zeros([self.wfc_data['nbnd'], fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            # for index, gvec in enumerate(tqdm(self.wfc_data['mill'], desc='store wfc_g')):
-            for index, gvec in enumerate(self.wfc_data['mill']):
-                eig = self.wfc_data['evc'][:, index]
-                evc_g[:, gvec[0], gvec[1], gvec[2]] = eig
-                if self.wfc_data['gamma_only'] is True:
-                    if (gvec[0] != 0 or gvec[1] != 0 or gvec[2] != 0):
-                        evc_g[:, -gvec[0], -gvec[1], -gvec[2]] = np.conj(eig)
-            if not realSpace:
-                return evc_g
-            else:
-                evc_r = np.fft.ifftn(evc_g, axes=(1, 2, 3,), norm='forward')
-                return evc_r
-        else:
-            # memory is not enough, store file under folder for further loading
-            assert(storeFolder is not None)
-            isExist = os.path.exists(storeFolder)
-            if not isExist:
-                # Create a new directory because it does not exist
-                os.makedirs(storeFolder)
-            millIndex = self.wfc_data['mill']
-            allZeroIndex = -1
-            for index in range(millIndex.shape[0]):
-                if millIndex[index, 0] == 0 and millIndex[index, 1] == 0 and millIndex[index, 2] == 0:
-                    allZeroIndex = index
-                    break
-            if allZeroIndex != -1:
-                millIndex = np.delete(millIndex, allZeroIndex, axis=0)
-
-            self.lock_Ibnds.acquire()
-            self.storeIbndList = list(range(self.wfc_data['nbnd']))
-            self.storeIbndList.append(-1)
-            self.iBnds_condition.notify_all()
-            self.lock_Ibnds.release()
-            
-            threads = []
-            for _ in range(self.threadNum):
-                thread_id = threading.Thread(target=self.storeGWorker, args=(millIndex, fft_grid, allZeroIndex, storeFolder, realSpace,))
-                threads.append(thread_id)
-
-            for thread_id in threads:
-                thread_id.start()
-
-            for thread_id in threads:
-                thread_id.join()
-            
-            # TODO: multithread
-            # PERF: Fully Optimized
-
-            # for ibnd in tqdm(range(wfc_data['nbnd']), desc='store ibnd'):
-            #     evc_g = np.zeros([fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            #     wfc_slice = list(wfc_data['evc'][ibnd, :])
-            #     evc_g[wfc_data['mill'][:, 0], wfc_data['mill'][:, 1], wfc_data['mill'][:, 2]] = wfc_data['evc'][ibnd, :]
-            #     if allZeroIndex != -1:
-            #         del wfc_slice[allZeroIndex]
-            #     evc_g[ - millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
-            #     evc_r = None
-            #     if not realSpace:
-            #         wfcName = 'wfc_g_' + str(ibnd + 1).zfill(5)
-            #         np.save(storeFolder + '/' + wfcName, evc_g)
-            #     else:
-            #         evc_r = np.fft.ifftn(evc_g, norm='forward')
-            #         wfcName = 'wfc_r_' + str(ibnd + 1).zfill(5)
-            #         np.save(storeFolder + '/' + wfcName, evc_r)
-            return
-
-    def storeGWorker(self, millIndex, fft_grid, allZeroIndex, storeFolder, realSpace):
-        while True:
-            self.lock_Ibnds.acquire()
-            while len(self.storeIbndList) == 0:
-                self.iBnds_condition.wait()
-            iBnd = self.storeIbndList.pop(0)
-            # poison
-            if iBnd == -1:
-                self.storeIbndList.append(-1)
-                self.lock_Ibnds.release()
-                return
-            # not a poison
-            self.lock_Ibnds.release()
-
-            # for ibnd in tqdm(iBnds, desc='store ibnd'):
-            evc_g = np.zeros([fft_grid[0], fft_grid[1], fft_grid[2]], dtype=np.complex128)
-            wfc_slice = self.wfc_data['evc'][iBnd, :]
-            evc_g[self.wfc_data['mill'][:, 0], self.wfc_data['mill'][:, 1], self.wfc_data['mill'][:, 2]] = self.wfc_data['evc'][iBnd, :]
-            if allZeroIndex != -1:
-                wfc_slice = np.delete(wfc_slice, allZeroIndex)
-            if self.wfc_data['gamma_only'] is True:
-                evc_g[- millIndex[:, 0], - millIndex[:, 1], - millIndex[:, 2]] = np.conj(wfc_slice)
-            evc_r = None
-            if not realSpace:
-                wfcName = 'wfc_g_' + str(iBnd + 1).zfill(5)
-                np.save(storeFolder + '/' + wfcName, evc_g)
-            else:
-                evc_r = np.fft.ifftn(evc_g, norm='forward')
-                wfcName = 'wfc_r_' + str(iBnd + 1).zfill(5)
-                np.save(storeFolder + '/' + wfcName, evc_r)
+            return wfc_dict
 
     def info(self):
-        qe_data = self.xml_data
-        return qe_data
+        rank = 0
+        if not self.comm is None:
+            rank = self.comm.Get_rank()
+        if rank == 0:
+            print("----------------QE XML-------------------")
+            print(f"{'cell':^10}:")
+            print(self.xml_data['cell'])
+            print('\n')
+            print(f"{'occupation':^10}:")
+            print(self.xml_data['occ'])
+            print('\n')
+            print(f"{'nbnd':^10}: {self.xml_data['nbnd']:10.5f}")
+            print(f"{'nspin':^10}: {self.xml_data['nspin']:10.5f}")
+            print(f"{'nks':^10}: {self.xml_data['nks']:10.5f}")
+            print(f"{'fermiEne':^10}: {self.xml_data['fermi']:10.5f}")
+            print(f"{'npv':^10}:")
+            print(self.xml_data['fftw'])
+            print('\n')
+            print("----------------QBOX XML-------------------")
+        return self.xml_data
 
 if __name__ == "__main__":
     # test
@@ -371,7 +274,8 @@ if __name__ == "__main__":
     comm = MPI.COMM_WORLD
     qe = QERead(comm)
     qe.parse_QE_XML("../bn.save/data-file-schema.xml")
-    wfc_data = qe.parse_QE_wfc("../bn.save/wfc1.dat")
+    qe.parse_QE_wfc("../bn.save/wfc1.dat")
+    qe.info()
     rank = comm.Get_rank()
     # get the end time
     et = time.time()
