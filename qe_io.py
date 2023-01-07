@@ -4,20 +4,18 @@ from tqdm import tqdm
 import threading
 import os
 import h5py
+import pickle
+from mpi4py import MPI
 import time
 
 class QERead:
-    storeIbndList = []
-    lock_Ibnds = threading.Lock()
-    iBnds_condition = threading.Condition(lock_Ibnds)
-    xml_data = None
-    wfc_data = None
-    threadNum = None
 
-    def __init__(self, numThread=15):
-        self.threadNum = numThread
+    def __init__(self, comm=None):
+        self.xml_data = None
+        self.wfc_data = None
+        self.comm = comm
 
-    def parse_QE_XML(self, file_name):
+    def parse_QE_XML(self, file_name, storeFolder='./wfc/'):
         """
         analyze QE data-file-schema.xml
             param:
@@ -25,6 +23,16 @@ class QERead:
             return:
                  dict of {'nks', 'kweights', 'nbnd', 'eigen', 'occ', 'fftw'}
         """
+        rank = 0
+        if not self.comm is None:
+            rank = self.comm.Get_rank()
+        if rank == 0:
+            isExist = os.path.exists(storeFolder)
+            if not isExist:
+                # Create a new directory because it does not exist
+                os.makedirs(storeFolder)
+        if not self.comm is None:
+            self.comm.Barrier()
         # unit convert
         hartree2ev = 27.2114
 
@@ -111,10 +119,13 @@ class QERead:
                     'eigen': eigenvalues,
                     'occ': occupations,
                     'fftw': [np0v, np1v, np2v]}
+        if rank == 0:
+            with open(storeFolder + '/qe_xml.pickle', 'wb') as handle:
+                pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
         self.xml_data = out_dict
         return out_dict 
 
-    def parse_QE_wfc(self, file_name, hdf5=False):
+    def parse_QE_wfc(self, file_name, storeFolder='./wfc/'):
         """
         analyze QE wfc*.dat 
             param:
@@ -122,6 +133,20 @@ class QERead:
             return:
                  dict of {'ik', 'xk', 'ispin', 'nbnd', 'ngw', 'evc'...}
         """
+        hdf5 = '.hdf5' in file_name 
+
+        rank, size = 0, 1
+        if not self.comm is None:
+            size = self.comm.Get_size()
+            rank = self.comm.Get_rank()
+        if rank == 0:
+            isExist = os.path.exists(storeFolder)
+            if not isExist:
+                # Create a new directory because it does not exist
+                os.makedirs(storeFolder)
+        if not self.comm is None:
+            self.comm.Barrier()
+
         wfc_dict = None
         if not hdf5:
             with open(file_name, 'rb') as f:
@@ -154,12 +179,6 @@ class QERead:
                 mill = np.fromfile(f, dtype='int32', count=3*igwx)
                 mill = mill.reshape( (igwx, 3) ) 
 
-                evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
-                f.seek(8,1)
-                # for i in tqdm(range(nbnd), desc='read wfc bands'):
-                for i in range(nbnd):
-                    evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
-                    f.seek(8, 1)
                 wfc_dict = {'ik': ik,
                             'xk': xk,
                             'ispin': ispin,
@@ -169,9 +188,45 @@ class QERead:
                             'igwx': igwx,
                             'npol': npol,
                             'nbnd': nbnd,
-                            'mill': mill,
-                            'b': [b1, b2, b3],
-                            'evc': evc}
+                            'b': [b1, b2, b3]}
+
+                f.seek(8,1)
+                send_data = None
+                if rank == 0:
+                    evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
+                    for i in range(nbnd):
+                        evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
+                        f.seek(8, 1)
+                    arrs = np.array_split(evc, size, axis=0)
+                    raveled = [np.ravel(arr) for arr in arrs]
+                    send_data = np.concatenate(raveled)
+                ibnd_global = np.arange(nbnd)
+                ibnd_loc=  np.array_split(ibnd_global, size)
+                count = [len(a) * npol * igwx for a in ibnd_loc]
+                displ = np.array([sum(count[:p]) for p in range(size)])
+
+                recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
+                comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+
+                fftw = self.xml_data['fftw']
+                fft_grid = np.array(fftw) // 2 + 1
+                if rank == 0:
+                    pbar = tqdm(desc='store wfc', total=nbnd)
+                for index, i in enumerate(ibnd_loc[rank]):
+                    evc_g = np.zeros(fft_grid, dtype=np.complex128)
+                    evc_g[mill[:, 0], mill[:, 1], mill[:, 2]] = recvbuf[index, :] 
+                    if gamma_only:
+                        assert(np.all(mill[0, :] == 0))
+                        evc_g[-mill[1:, 0], -mill[1:, 1], -mill[1:, 2]] = np.conj(recvbuf[index, 1:]) 
+                    evc_r = np.fft.ifftn(evc_g, norm='forward')
+                    fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
+                    np.save(fileName, evc_r)
+                    if rank == 0:
+                        value = np.sum([len(loc) > index for loc in ibnd_loc]) 
+                        pbar.update(value)
+                if rank == 0:
+                    pbar.close()
+
         else:
             wfc_dict = {}
             with h5py.File(file_name, 'r') as f:
@@ -188,7 +243,7 @@ class QERead:
                         wfc_dict['b'] = [b1, b2, b3]
                     if key == "evc":
                         evc = value[()]
-                        wfc_dict[key] = evc[:, 0::2] + 1j * evc[:, 1::2]
+                        evc = evc[:, 0::2] + 1j * evc[:, 1::2]
 
         self.wfc_data = wfc_dict
         return wfc_dict
@@ -307,24 +362,22 @@ class QERead:
                 np.save(storeFolder + '/' + wfcName, evc_r)
 
     def info(self):
-        qe_data = self.xml_data | self.wfc_data
+        qe_data = self.xml_data
         return qe_data
 
 if __name__ == "__main__":
     # test
     st = time.time()
-
-    qe = QERead(15)
+    comm = MPI.COMM_WORLD
+    qe = QERead(comm)
     qe.parse_QE_XML("../bn.save/data-file-schema.xml")
     wfc_data = qe.parse_QE_wfc("../bn.save/wfc1.dat")
-    qe.computeWFC(Store=True, storeFolder="./wfc/")
-    print(wfc_data['mill'].shape)
-    print(wfc_data['evc'].shape)
-    print(wfc_data['gamma_only'])
-
+    rank = comm.Get_rank()
     # get the end time
     et = time.time()
 
     # get the execution time
     elapsed_time = et - st
-    print('Execution time:', elapsed_time, 'seconds')
+    comm.Barrier()
+    if rank == 0:
+        print('Execution time:', elapsed_time, 'seconds')
