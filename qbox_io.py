@@ -11,12 +11,12 @@ from mpi4py import MPI
 from tqdm import tqdm
 
 class QBOXRead:
-    wfc_data = None
 
-    def __init__(self):
-        pass
+    def __init__(self, comm=None):
+        self.wfc_data = None
+        self.comm = comm
 
-    def parse_QBOX_XML(self, file_name, comm, storeFolder='./wfc/'):
+    def parse_QBOX_XML(self, file_name, storeFolder='./wfc/'):
         """
         analyze qbox sample xml files 
             param:
@@ -24,14 +24,17 @@ class QBOXRead:
             return:
                 dict of {'nbnd', 'fftw', 'nspin', 'evc'}
         """
-        size = comm.Get_size()
-        rank = comm.Get_rank()
+        rank, size = 0, 1
+        if not self.comm is None:
+            size = self.comm.Get_size()
+            rank = self.comm.Get_rank()
         if rank == 0:
             isExist = os.path.exists(storeFolder)
             if not isExist:
                 # Create a new directory because it does not exist
                 os.makedirs(storeFolder)
-        comm.Barrier()
+        if not self.comm is None:
+            self.comm.Barrier()
 
         context = etree.iterparse(file_name, huge_tree=True, events=('start', 'end'))
 
@@ -218,8 +221,8 @@ if __name__ == "__main__":
     # test
     st = time.time()
 
-    qbox = QBOXRead()
-    qbox.parse_QBOX_XML(args.xml, comm=comm)
+    qbox = QBOXRead(comm=comm)
+    qbox.parse_QBOX_XML(args.xml)
 
     # get the end time
     et = time.time()
