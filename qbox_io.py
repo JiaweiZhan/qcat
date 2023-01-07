@@ -159,36 +159,6 @@ class QBOXRead:
                 pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         return wfc_dict
 
-
-
-    def storeWFC(self, realSpace=True, store=True, storeFolder='./wfc/'):
-        """
-        storing real wfc in storeFolder 
-        param:
-            realSpace: bool, whether convert wfc to real space
-            storeFolder: str, whether the wfc is strored
-        """
-        isExist = os.path.exists(storeFolder)
-        if not isExist:
-            # Create a new directory because it does not exist
-            os.makedirs(storeFolder)
-
-        with open(storeFolder + '/qbox.pickle', 'wb') as handle:
-            pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        if store:
-            nspin = self.wfc_data['nspin']
-            nbnd = self.wfc_data['nbnd']
-            for ispin in range(nspin):
-                for ibnd in range(nbnd):
-                    if realSpace:
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd + 1).zfill(5) + '_r'
-                        np.save(fileName, self.wfc_data['evc'][ispin, ibnd])
-                    else:
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd + 1).zfill(5) + '_g'
-                        evc_g = np.fft.fftn(self.wfc_data['evc'][ispin, ibnd], norm='forward')
-                        np.save(fileName, evc_g)
-
     def info(self):
         print("----------------QBOX XML-------------------")
         print(f"{'cell':^10}:")
