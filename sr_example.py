@@ -23,14 +23,14 @@ if __name__ == "__main__":
     if not args.abinitio:
         args.abinitio = "qbox"
     if not args.info:
-        args.info = None 
+        args.info = "None" 
     if not args.wfc:
         args.wfc = "./gs.gs.xml" 
 
     if rank == 0:
         print(f"configure:\
                 \n {''.join(['-'] * 41)}\
-                \n{'software':^20}:{args.abinitioRead:^20}\
+                \n{'software':^20}:{args.abinitio:^20}\
                 \n{'info':^20}:{args.info:^20}\
                 \n{'wfc':^20}:{args.wfc:^20}\
                 \n {''.join(['-'] * 41)}\n\
@@ -41,4 +41,6 @@ if __name__ == "__main__":
         abinitioRead = qbox_io.QBOXRead(comm)
     elif args.abinitio.lower() == "qe":
         abinitioRead = qe_io.QERead(comm)
+    if args.info == "None":
+        args.info = None
     utils.local_contribution(abinitioRead, info_name=args.info, wfc_name=args.wfc, comm=comm)

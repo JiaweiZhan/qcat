@@ -83,11 +83,12 @@ def vint(fftw, cell):
                 index_k = fftFreq[2][k]
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
-    G_vec_norm[0, 0, 0] = 1
+    index = np.argwhere(G_vec_norm == 0)
+    G_vec_norm[index] = 1
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm
     L_help = ((2.0 * np.pi) ** 3.0 / volume * 3.0 / 4.0 / np.pi) ** (1.0 / 3.0)
     divergence = 16.0 * np.pi ** 2 / ((2.0 * np.pi) ** 3.0) * L_help
-    G_vec_norm[0, 0, 0] = divergence
+    G_vec_norm[index] = divergence
     return G_vec_norm
 
 def vint_erfc(fftw, cell, mu):
@@ -112,10 +113,11 @@ def vint_erfc(fftw, cell, mu):
                 index_k = fftFreq[2][k]
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
-    G_vec_norm[0, 0, 0] = 1
+    index = np.argwhere(G_vec_norm == 0)
+    G_vec_norm[index] = 1
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm * (1.0 - np.exp(-G_vec_norm / 4.0 / mu ** 2))
     divergence = 1.0 / 4.0 / mu ** 2 / volume * 4 * np.pi
-    G_vec_norm[0, 0, 0] = divergence
+    G_vec_norm[index] = divergence
     return G_vec_norm
 
 def factorizable(n):
@@ -152,6 +154,15 @@ def local_contribution(read_obj, info_name, wfc_name, comm, storeFolder='./wfc/'
     fftw = info_data['fftw']
     occ = info_data['occ']
     fileNameList = info_data['wfc_file']
+
+    # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
+    try:
+        nbnd[0]
+    except TypeError:
+        nbnd = [nbnd] * nspin
+    if len(occ.shape) == 3:
+        occ = occ[:, 0, :]
+        fileNameList = fileNameList[:, 0, :]
 
     v_g = vint(fftw, cell)
     v_g_mu = vint_erfc(fftw, cell, mu=0.71)
