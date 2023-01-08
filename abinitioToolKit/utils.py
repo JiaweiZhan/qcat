@@ -31,7 +31,7 @@ def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
             file_object.write(f'{lcbm[i]:12.5f}')
             if i % 5 == 4:
                 file_object.write('\n')
-    print(f"Local band edge is printed in {fileName}")
+    print(f"\n\nLocal band edge is printed in {fileName}")
 
 def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
     if kernel_size % 2 == 0:
@@ -98,7 +98,7 @@ def vint_erfc(fftw, cell, mu):
     mu: 0.65
     """
     b = np.zeros((3, 3))
-    volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
+    volume = np.abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
     fac = 2.0 * np.pi
     b[0] = fac / volume * np.cross(cell[1], cell[2])
     b[1] = fac / volume * np.cross(cell[2], cell[0])
@@ -134,24 +134,25 @@ def factorizable(n):
         n /= 2
     return n == 1
 
-def local_contribution(xml, comm, storeFolder='./wfc/'):
+def local_contribution(read_obj, info_name, wfc_name, comm, storeFolder='./wfc/'):
     rank = comm.Get_rank()
     size = comm.Get_size()
-    qbox = QBOXRead()
-    qbox.parse_QBOX_XML(xml, comm=comm, storeFolder=storeFolder)
+    read_obj.parse_info(info_name)
+    read_obj.parse_wfc(wfc_name, storeFolder=storeFolder)
 
     comm.Barrier()
-    with open(storeFolder + '/qbox.pickle', 'rb') as handle:
-        xml_data = pickle.load(handle)
+    with open(storeFolder + '/info.pickle', 'rb') as handle:
+        info_data = pickle.load(handle)
 
     if rank == 0:
         print("store wfc done!")
 
-    nbnd = xml_data['nbnd']
-    nspin = xml_data['nspin']
-    cell = xml_data['cell']
-    fftw = xml_data['fftw']
-    occ = xml_data['occ']
+    nbnd = info_data['nbnd']
+    nspin = info_data['nspin']
+    cell = info_data['cell']
+    fftw = info_data['fftw']
+    occ = info_data['occ']
+    fileNameList = info_data['wfc_file']
 
     v_g = vint(fftw, cell)
     v_g_mu = vint_erfc(fftw, cell, mu=0.71)
@@ -163,10 +164,11 @@ def local_contribution(xml, comm, storeFolder='./wfc/'):
             pbar = tqdm(desc=f'compute local contri. for {ispin + 1}', total=total_iter)
         for ibnd_i in range(nbnd[ispin]): 
             if ibnd_i % size == rank:
-                fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_i + 1).zfill(5) + '_r' + '.npy'
+                fileName = fileNameList[ispin, ibnd_i]
                 wfc_i = np.load(fileName)
                 for ibnd_j in range(ibnd_i, nbnd[ispin]): 
-                    fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
+                    # fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
+                    fileName = fileNameList[ispin, ibnd_j]
                     wfc_j = np.load(fileName)
                     wfc_ij = wfc_i * wfc_j
                     wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 

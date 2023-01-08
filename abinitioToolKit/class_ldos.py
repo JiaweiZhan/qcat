@@ -32,7 +32,7 @@ class LDOS:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
         qe = qe_io.QERead(self.comm)
-        xml_data = qe.parse_QE_XML(self.saveFolder + '/data-file-schema.xml')
+        xml_data = qe.parse_info(self.saveFolder + '/data-file-schema.xml')
         numOcc = xml_data['occ']
         kWeights = xml_data['kweights']
         nbnd = xml_data['nbnd']
@@ -41,7 +41,6 @@ class LDOS:
         nks = numOcc.shape[1]
         nbnd = numOcc.shape[2]
         fft_grid = xml_data['fftw']
-        fft_grid = np.array(fft_grid) // 2 + 1
 
         if rank == 0:
             if np.all(numOcc > 0):
@@ -53,26 +52,23 @@ class LDOS:
         self.comm.Barrier()
 
         ksStateZAve_loc = np.zeros((nspin, nks, nbnd, fft_grid[2]), dtype=np.double)
-        wfc_files = [self.saveFolder + '/' + file for file in os.listdir(self.saveFolder) if 'wfc' in file]
 
-        for index in range(nks * nspin):
-            wfc_data = qe.parse_QE_wfc(wfc_files[index], storeFolder=storeFolder)
-            self.comm.Barrier()
-            ispin = wfc_data['ispin']
-            ik = wfc_data['ik']
+        qe.parse_wfc(self.saveFolder, storeFolder=storeFolder)
 
-            wfcStored = [name for name in os.listdir(storeFolder) if "wfc" in name]
-            for index, fileName in enumerate(wfcStored):
-                if index % size == rank:
-                    wfcName = storeFolder + '/' + fileName
-                    ibnd = int(fileName.split('.')[0].split('_')[-2])
-                    evc_r = np.load(wfcName)
-                    ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
+        wfcStored = [name for name in os.listdir(storeFolder) if "wfc" in name]
 
-            self.comm.Barrier()
-            if rank == 0:
-                shutil.rmtree(storeFolder)
-            self.comm.Barrier()
+        for index, fileName in enumerate(wfcStored):
+            if index % size == rank:
+                wfcName = storeFolder + '/' + fileName
+                ibnd = int(fileName.split('.')[0].split('_')[-2])
+                ik = int(fileName.split('.')[0].split('_')[-3])
+                ispin = int(fileName.split('.')[0].split('_')[-4])
+                evc_r = np.load(wfcName)
+                ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
+
+        self.comm.Barrier()
+        if rank == 0:
+            shutil.rmtree(storeFolder)
         ksStateZAve = np.zeros_like(ksStateZAve_loc)
         self.comm.Allreduce(ksStateZAve_loc, ksStateZAve)
 
@@ -135,8 +131,8 @@ if __name__=="__main__":
     st = time.time()
 
     qe = qe_io.QERead(comm)
-    qe.parse_QE_XML('../bn.save/data-file-schema.xml')
-    qe.parse_QE_wfc('../bn.save/wfc1.dat')
+    qe.parse_info('../bn.save/data-file-schema.xml')
+    qe.parse_wfc('../bn.save/wfc1.dat')
 
     # get the end time
     et = time.time()

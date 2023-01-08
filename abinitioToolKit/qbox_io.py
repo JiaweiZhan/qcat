@@ -3,19 +3,23 @@ import argparse
 import numpy as np
 import base64, os, time
 from . import utils
+from .io import Read
 from lxml import etree
 from mpi4py import MPI
 import pickle
 from mpi4py import MPI
 from tqdm import tqdm
 
-class QBOXRead:
+class QBOXRead(Read):
 
     def __init__(self, comm=None):
         self.wfc_data = None
         self.comm = comm
 
-    def parse_QBOX_XML(self, file_name, storeFolder='./wfc/'):
+    def parse_info(self, file_name=None, store=True, storeFolder='./wfc/'):
+        pass
+
+    def parse_wfc(self, file_name, storeFolder='./wfc/'):
         """
         analyze qbox sample xml files 
             param:
@@ -90,6 +94,14 @@ class QBOXRead:
         context = etree.iterparse(file_name, huge_tree=True)
 
         index_mp = 0
+        fileNameList_tot = [] 
+        for isp in range(nspin):
+            fileNameList_sp = [] 
+            for iwf in range(nbnd[isp]):
+                fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
+                fileNameList_sp.append(fileName)
+            fileNameList_tot.append(fileNameList_sp)
+        fileNameList_tot = np.array(fileNameList_tot)
         if rank == 0:
             total_iter = np.sum(nbnd)
             pbar = tqdm(desc='store wfc', total=total_iter)
@@ -154,10 +166,11 @@ class QBOXRead:
                     'nempty': nempty,
                     'occ': occ,
                     'fftw': fftw,
-                    'npv': npv}
+                    'npv': npv,
+                    'wfc_file': fileNameList_tot}
         self.wfc_data = wfc_dict
         if rank == 0:
-            with open(storeFolder + '/qbox.pickle', 'wb') as handle:
+            with open(storeFolder + '/info.pickle', 'wb') as handle:
                 pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         return wfc_dict
 
@@ -221,7 +234,7 @@ if __name__ == "__main__":
     st = time.time()
 
     qbox = QBOXRead(comm=comm)
-    qbox.parse_QBOX_XML(args.xml)
+    qbox.parse_wfc(args.xml)
 
     # get the end time
     et = time.time()

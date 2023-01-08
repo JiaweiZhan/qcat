@@ -21,7 +21,7 @@ class LF:
         self.qbox_xml = qbox_xml
 
     def readWFC(self, wfc_folder='./wfc/'):
-        with open(wfc_folder + '/qbox.pickle', 'rb') as handle:
+        with open(wfc_folder + '/info.pickle', 'rb') as handle:
             self.xml_data = pickle.load(handle)
 
     def info(self):

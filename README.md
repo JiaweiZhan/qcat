@@ -50,11 +50,11 @@ sinteractive --exclusive --partition=broadwl --nodes=1 --ntasks=28 --gres=gpu:0 
     if rank == 0:
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
 ```
-see [`example.py`](./example.py) for reference
+see [`ldos_example.py`](./ldos_example.py) for reference
 
 3. Run:
 ```
-mpirun [-np NTASKS] python3 example.py [-h] [-s SAVE_FOLDER] [-d DELTA] 
+mpirun [-np NTASKS] python3 ldos_example.py [-h] [-s SAVE_FOLDER] [-d DELTA] 
 ```
 4. Configuration:
 ```
