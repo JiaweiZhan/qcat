@@ -84,11 +84,11 @@ def vint(fftw, cell):
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
     index = np.argwhere(G_vec_norm == 0)
-    G_vec_norm[index] = 1
+    G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [1] * index.shape[0]
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm
     L_help = ((2.0 * np.pi) ** 3.0 / volume * 3.0 / 4.0 / np.pi) ** (1.0 / 3.0)
     divergence = 16.0 * np.pi ** 2 / ((2.0 * np.pi) ** 3.0) * L_help
-    G_vec_norm[index] = divergence
+    G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [divergence] * index.shape[0]
     return G_vec_norm
 
 def vint_erfc(fftw, cell, mu):
@@ -114,10 +114,10 @@ def vint_erfc(fftw, cell, mu):
                 G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
                 G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
     index = np.argwhere(G_vec_norm == 0)
-    G_vec_norm[index] = 1
+    G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [1] * index.shape[0]
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm * (1.0 - np.exp(-G_vec_norm / 4.0 / mu ** 2))
     divergence = 1.0 / 4.0 / mu ** 2 / volume * 4 * np.pi
-    G_vec_norm[index] = divergence
+    G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [divergence] * index.shape[0]
     return G_vec_norm
 
 def factorizable(n):
