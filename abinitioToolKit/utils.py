@@ -5,12 +5,11 @@ from scipy.signal import savgol_filter
 from mpi4py import MPI
 import pickle
 from tqdm import tqdm
-from .qbox_io import QBOXRead
 
 def time_now():
     now = datetime.datetime.now()
     print("=====================================================")
-    print("*               QE/Qbox Analyzer                     ")
+    print("*               abinitioToolKit                      ")
     print("*   Developed by Jiawei Zhan <jiaweiz@uchicago.edu>  ")
     print("*  Supported by Galli Group @ University of Chicago  ")
     print("* -- ")
@@ -161,7 +160,7 @@ def local_contribution(read_obj, info_name, wfc_name, comm, storeFolder='./wfc/'
     for ispin in range(nspin):
         if rank == 0:
             total_iter = nbnd[ispin]
-            pbar = tqdm(desc=f'compute local contri. for {ispin + 1}', total=total_iter)
+            pbar = tqdm(desc=f'compute local contri. for spin:{ispin + 1:^3}/{nspin:^3}', total=total_iter)
         for ibnd_i in range(nbnd[ispin]): 
             if ibnd_i % size == rank:
                 fileName = fileNameList[ispin, ibnd_i]
@@ -191,6 +190,7 @@ def local_contribution(read_obj, info_name, wfc_name, comm, storeFolder='./wfc/'
 
     if rank == 0:
         print(f"upper / lower: {upper/lower:5.3f}")
+    read_obj.clean_wfc(storeFolder=storeFolder)
 
 
 if __name__ == "__main__":

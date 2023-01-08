@@ -2,13 +2,15 @@
 import argparse
 import numpy as np
 import base64, os, time
-from . import utils
-from .io import Read
 from lxml import etree
 from mpi4py import MPI
 import pickle
 from mpi4py import MPI
 from tqdm import tqdm
+import shutil
+
+from . import utils
+from .io import Read
 
 class QBOXRead(Read):
 
@@ -198,6 +200,17 @@ class QBOXRead(Read):
         print(self.wfc_data['npv'])
         print("----------------QBOX XML-------------------")
         return self.wfc_data
+
+    def clean_wfc(self, storeFolder='./wfc/'):
+        rank = 0
+        if not self.comm is None:
+            rank = self.comm.Get_rank()
+        if rank == 0:
+            isExist = os.path.exists(storeFolder)
+            if isExist:
+                shutil.rmtree(storeFolder)
+        if not self.comm is None:
+            self.comm.Barrier()
         
 
 if __name__ == "__main__":

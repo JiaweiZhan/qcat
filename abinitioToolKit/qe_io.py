@@ -332,6 +332,17 @@ class QERead(Read):
             print("----------------QBOX XML-------------------")
         return self.xml_data
 
+    def clean_wfc(self, storeFolder='./wfc/'):
+        rank = 0
+        if not self.comm is None:
+            rank = self.comm.Get_rank()
+        if rank == 0:
+            isExist = os.path.exists(storeFolder)
+            if isExist:
+                shutil.rmtree(storeFolder)
+        if not self.comm is None:
+            self.comm.Barrier()
+
 if __name__ == "__main__":
     # test
     st = time.time()
