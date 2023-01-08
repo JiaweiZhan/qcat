@@ -55,7 +55,7 @@ class LDOS:
         ksStateZAve_loc = np.zeros((nspin, nks, nbnd, fft_grid[2]), dtype=np.double)
         wfc_files = [self.saveFolder + '/' + file for file in os.listdir(self.saveFolder) if 'wfc' in file]
 
-        for index in tqdm(range(nks * nspin), desc='read wfc'):
+        for index in range(nks * nspin):
             wfc_data = qe.parse_QE_wfc(wfc_files[index], storeFolder=storeFolder)
             self.comm.Barrier()
             ispin = wfc_data['ispin']
@@ -69,7 +69,10 @@ class LDOS:
                     evc_r = np.load(wfcName)
                     ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
 
-            shutil.rmtree(storeFolder)
+            self.comm.Barrier()
+            if rank == 0:
+                shutil.rmtree(storeFolder)
+            self.comm.Barrier()
         ksStateZAve = np.zeros_like(ksStateZAve_loc)
         self.comm.Allreduce(ksStateZAve_loc, ksStateZAve)
 
@@ -114,8 +117,6 @@ class LDOS:
                         max_arg += 1
                 if max_arg != int(np.sum(numOcc)):
                     max_arg -= 1
-                print(z, min_arg, max_arg)
-                print(len(lcbm_loc), len(eneSort))
                 lvbm_loc[z] = eneSort[min_arg]
                 lcbm_loc[z] = eneSort[max_arg]
         self.lcbm = np.zeros_like(lcbm_loc)
@@ -133,7 +134,6 @@ if __name__=="__main__":
     rank = comm.Get_rank()
     st = time.time()
 
-    numThread = 15
     qe = qe_io.QERead(comm)
     qe.parse_QE_XML('../bn.save/data-file-schema.xml')
     qe.parse_QE_wfc('../bn.save/wfc1.dat')

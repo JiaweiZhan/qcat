@@ -14,7 +14,7 @@ class QERead:
         self.xml_data = None
         self.comm = comm
 
-    def parse_QE_XML(self, file_name, storeFolder='./wfc/'):
+    def parse_QE_XML(self, file_name, store=True, storeFolder='./wfc/'):
         """
         analyze QE data-file-schema.xml
             param:
@@ -26,10 +26,11 @@ class QERead:
         if not self.comm is None:
             rank = self.comm.Get_rank()
         if rank == 0:
-            isExist = os.path.exists(storeFolder)
-            if not isExist:
-                # Create a new directory because it does not exist
-                os.makedirs(storeFolder)
+            if store:
+                isExist = os.path.exists(storeFolder)
+                if not isExist:
+                    # Create a new directory because it does not exist
+                    os.makedirs(storeFolder)
         if not self.comm is None:
             self.comm.Barrier()
         # unit convert
@@ -119,8 +120,9 @@ class QERead:
                     'occ': occupations,
                     'fftw': [np0v, np1v, np2v]}
         if rank == 0:
-            with open(storeFolder + '/qe_xml.pickle', 'wb') as handle:
-                pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            if store:
+                with open(storeFolder + '/qe_xml.pickle', 'wb') as handle:
+                    pickle.dump(out_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
         self.xml_data = out_dict
         return out_dict 
 

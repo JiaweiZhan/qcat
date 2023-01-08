@@ -7,6 +7,7 @@ from class_ldos import LDOS
 import qe_io
 import utils
 from mpi4py import MPI
+import time
 
 comm = MPI.COMM_WORLD
 
@@ -44,14 +45,18 @@ if __name__ == "__main__":
     if not args.delta:
         args.delta = 0.001 
 
-    print(f"configure:\
-            \n {''.join(['-'] * 41)}\
-            \n{'QE save folder':^20}:{args.save_folder:^20}\
-            \n{'delta':^20}:{args.delta:^20}\
-            \n {''.join(['-'] * 41)}\n\
-            ")
+    if rank == 0:
+        print(f"configure:\
+                \n {''.join(['-'] * 41)}\
+                \n{'QE save folder':^20}:{args.save_folder:^20}\
+                \n{'delta':^20}:{args.delta:^20}\
+                \n {''.join(['-'] * 41)}\n\
+                ")
 
     # ---------------------------------Compute LDOS------------------------------------
+
+    rank = comm.Get_rank()
+    st = time.time()
 
     localDensityOfState = LDOS(delta=args.delta, saveFolder=args.save_folder, comm=comm)
     localDensityOfState.computeLDOS()
@@ -61,7 +66,15 @@ if __name__ == "__main__":
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
 
         qe = qe_io.QERead()
-        xml_data = qe.parse_QE_XML(args.save_folder + '/data-file-schema.xml')
+        xml_data = qe.parse_QE_XML(args.save_folder + '/data-file-schema.xml', store=False)
         cell = xml_data['cell']
         z_length = np.linalg.norm(cell[-1])
         utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=z_length, picName='ldos.pdf')
+
+    # get the execution time
+    # get the end time
+    et = time.time()
+    elapsed_time = et - st
+    comm.Barrier()
+    if rank == 0:
+        print('Execution time:', elapsed_time, 'seconds')
