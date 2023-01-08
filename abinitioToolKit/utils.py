@@ -5,7 +5,7 @@ from scipy.signal import savgol_filter
 from mpi4py import MPI
 import pickle
 from tqdm import tqdm
-from qbox_io import QBOXRead
+from .qbox_io import QBOXRead
 
 def time_now():
     now = datetime.datetime.now()

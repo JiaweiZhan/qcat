@@ -1,12 +1,12 @@
 from xml.dom import minidom
 import numpy as np
 from tqdm import tqdm
-import threading
 import os
 import h5py
 import pickle
 from mpi4py import MPI
 import time
+import pathlib
 
 class QERead:
 
@@ -134,7 +134,7 @@ class QERead:
             return:
                  dict of {'ik', 'xk', 'ispin', 'nbnd', 'ngw', 'evc'...}
         """
-        hdf5 = '.hdf5' in file_name 
+        hdf5 = (".hdf5" == pathlib.Path(file_name).suffix)
 
         rank, size = 0, 1
         if not self.comm is None:
@@ -150,6 +150,7 @@ class QERead:
 
         wfc_dict = None
         if not hdf5:
+            send_data = None
             with open(file_name, 'rb') as f:
                 # Moves the cursor 4 bytes to the right
                 f.seek(4)
@@ -192,60 +193,98 @@ class QERead:
                             'b': [b1, b2, b3]}
 
                 f.seek(8,1)
-                send_data = None
+
                 if rank == 0:
                     evc = np.zeros( (nbnd, npol*igwx), dtype="complex128")
                     for i in range(nbnd):
                         evc[i,:] = np.fromfile(f, dtype='complex128', count=npol*igwx)
                         f.seek(8, 1)
-                    arrs = np.array_split(evc, size, axis=0)
-                    raveled = [np.ravel(arr) for arr in arrs]
-                    send_data = np.concatenate(raveled)
-                ibnd_global = np.arange(nbnd)
-                ibnd_loc=  np.array_split(ibnd_global, size)
-                count = [len(a) * npol * igwx for a in ibnd_loc]
-                displ = np.array([sum(count[:p]) for p in range(size)])
+                # step out of files
+            if rank == 0:
+                arrs = np.array_split(evc, size, axis=0)
+                raveled = [np.ravel(arr) for arr in arrs]
+                send_data = np.concatenate(raveled)
+            ibnd_global = np.arange(nbnd)
+            ibnd_loc=  np.array_split(ibnd_global, size)
+            count = [len(a) * npol * igwx for a in ibnd_loc]
+            displ = np.array([sum(count[:p]) for p in range(size)])
 
-                recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
-                self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+            recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
+            self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
 
-                fftw = self.xml_data['fftw']
-                fft_grid = np.array(fftw) // 2 + 1
+            fftw = self.xml_data['fftw']
+            fft_grid = np.array(fftw) // 2 + 1
+            if rank == 0:
+                pbar = tqdm(desc='store wfc', total=nbnd)
+            for index, i in enumerate(ibnd_loc[rank]):
+                evc_g = np.zeros(fft_grid, dtype=np.complex128)
+                evc_g[mill[:, 0], mill[:, 1], mill[:, 2]] = recvbuf[index, :] 
+                if gamma_only:
+                    assert(np.all(mill[0, :] == 0))
+                    evc_g[-mill[1:, 0], -mill[1:, 1], -mill[1:, 2]] = np.conj(recvbuf[index, 1:]) 
+                evc_r = np.fft.ifftn(evc_g, norm='forward')
+                fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
+                np.save(fileName, evc_r)
                 if rank == 0:
-                    pbar = tqdm(desc='store wfc', total=nbnd)
-                for index, i in enumerate(ibnd_loc[rank]):
-                    evc_g = np.zeros(fft_grid, dtype=np.complex128)
-                    evc_g[mill[:, 0], mill[:, 1], mill[:, 2]] = recvbuf[index, :] 
-                    if gamma_only:
-                        assert(np.all(mill[0, :] == 0))
-                        evc_g[-mill[1:, 0], -mill[1:, 1], -mill[1:, 2]] = np.conj(recvbuf[index, 1:]) 
-                    evc_r = np.fft.ifftn(evc_g, norm='forward')
-                    fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
-                    np.save(fileName, evc_r)
-                    if rank == 0:
-                        value = np.sum([len(loc) > index for loc in ibnd_loc]) 
-                        pbar.update(value)
-                if rank == 0:
-                    pbar.close()
+                    value = np.sum([len(loc) > index for loc in ibnd_loc]) 
+                    pbar.update(value)
+            if rank == 0:
+                pbar.close()
             return wfc_dict
 
         else:
-            wfc_dict = {}
-            with h5py.File(file_name, 'r') as f:
-                for key, value in f.attrs.items():
-                    if key == "gamma_only":
-                        value = bool(value)
-                    wfc_dict[key] = value
-                for key, value in f.items():
-                    if key == "MillerIndices":
-                        wfc_dict['mill'] = value[()]
-                        b1 = value.attrs['bg1']
-                        b2 = value.attrs['bg2']
-                        b3 = value.attrs['bg3']
-                        wfc_dict['b'] = [b1, b2, b3]
-                    if key == "evc":
-                        evc = value[()]
-                        evc = evc[:, 0::2] + 1j * evc[:, 1::2]
+            if rank == 0:
+                wfc_dict = {}
+                evc = None
+                with h5py.File(file_name, 'r') as f:
+                    for key, value in f.attrs.items():
+                        if key == "gamma_only":
+                            value = bool(value)
+                        wfc_dict[key] = value
+                    for key, value in f.items():
+                        if key == "MillerIndices":
+                            wfc_dict['mill'] = value[()]
+                            b1 = value.attrs['bg1']
+                            b2 = value.attrs['bg2']
+                            b3 = value.attrs['bg3']
+                            wfc_dict['b'] = [b1, b2, b3]
+                        if key == "evc":
+                            evc = value[()]
+                            evc = evc[:, 0::2] + 1j * evc[:, 1::2]
+                arrs = np.array_split(evc, size, axis=0)
+                raveled = [np.ravel(arr) for arr in arrs]
+                send_data = np.concatenate(raveled)
+            else:
+                wfc_dict = None
+                send_data = None
+            wfc_dict = self.comm.bcast(wfc_dict, root=0)
+            ibnd_global = np.arange(wfc_dict['nbnd'])
+            ibnd_loc=  np.array_split(ibnd_global, size)
+            count = [len(a) * wfc_dict['npol'] * wfc_dict['igwx'] for a in ibnd_loc]
+            displ = np.array([sum(count[:p]) for p in range(size)])
+
+            recvbuf = np.empty((len(ibnd_loc[rank]), wfc_dict['npol'] * wfc_dict['igwx']), dtype='complex128')
+            self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+
+            fftw = self.xml_data['fftw']
+            fft_grid = np.array(fftw) // 2 + 1
+            if rank == 0:
+                pbar = tqdm(desc='store wfc', total=wfc_dict['nbnd'])
+            for index, i in enumerate(ibnd_loc[rank]):
+                evc_g = np.zeros(fft_grid, dtype=np.complex128)
+                evc_g[wfc_dict['mill'][:, 0], wfc_dict['mill'][:, 1], wfc_dict['mill'][:, 2]] = recvbuf[index, :] 
+                if wfc_dict['gamma_only']:
+                    assert(np.all(wfc_dict['mill'][0, :] == 0))
+                    evc_g[-wfc_dict['mill'][1:, 0], -wfc_dict['mill'][1:, 1], -wfc_dict['mill'][1:, 2]] = np.conj(recvbuf[index, 1:]) 
+                evc_r = np.fft.ifftn(evc_g, norm='forward')
+                fileName = storeFolder + '/wfc_' + str(wfc_dict['ispin']) + '_' + str(wfc_dict['ik']).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
+                np.save(fileName, evc_r)
+                if rank == 0:
+                    value = np.sum([len(loc) > index for loc in ibnd_loc]) 
+                    pbar.update(value)
+            if rank == 0:
+                pbar.close()
+
             return wfc_dict
 
     def info(self):
@@ -275,8 +314,8 @@ if __name__ == "__main__":
     st = time.time()
     comm = MPI.COMM_WORLD
     qe = QERead(comm)
-    qe.parse_QE_XML("../bn.save/data-file-schema.xml")
-    qe.parse_QE_wfc("../bn.save/wfc1.dat")
+    qe.parse_QE_XML("../8bvo_6feooh_nspin2_hdf5.save/data-file-schema.xml")
+    qe.parse_QE_wfc("../8bvo_6feooh_nspin2_hdf5.save/wfcup1.hdf5")
     qe.info()
     rank = comm.Get_rank()
     # get the end time

@@ -2,10 +2,9 @@
 import argparse
 import numpy as np
 import base64, os, time
-import utils
+from . import utils
 from lxml import etree
 from mpi4py import MPI
-import shutil
 import pickle
 from mpi4py import MPI
 from tqdm import tqdm

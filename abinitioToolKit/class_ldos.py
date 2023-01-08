@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 import os, time, pathlib
 import threading
-import qe_io
+from . import qe_io
 import shutil
 from mpi4py import MPI
 
