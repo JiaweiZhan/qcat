@@ -135,11 +135,11 @@ def factorizable(n):
         n /= 2
     return n == 1
 
-def local_contribution(read_obj, info_name, wfc_name, comm, storeFolder='./wfc/'):
+def local_contribution(read_obj, saveFileFolder, comm, storeFolder='./wfc/'):
     rank = comm.Get_rank()
     size = comm.Get_size()
-    read_obj.parse_info(info_name)
-    read_obj.parse_wfc(wfc_name, storeFolder=storeFolder)
+    read_obj.parse_info(saveFileFolder)
+    read_obj.parse_wfc(saveFileFolder, storeFolder=storeFolder)
 
     comm.Barrier()
     with open(storeFolder + '/info.pickle', 'rb') as handle:

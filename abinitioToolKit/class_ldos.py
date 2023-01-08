@@ -32,7 +32,7 @@ class LDOS:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
         qe = qe_io.QERead(self.comm)
-        xml_data = qe.parse_info(self.saveFolder + '/data-file-schema.xml')
+        xml_data = qe.parse_info(self.saveFolder)
         numOcc = xml_data['occ']
         kWeights = xml_data['kweights']
         nbnd = xml_data['nbnd']
@@ -131,8 +131,8 @@ if __name__=="__main__":
     st = time.time()
 
     qe = qe_io.QERead(comm)
-    qe.parse_info('../bn.save/data-file-schema.xml')
-    qe.parse_wfc('../bn.save/wfc1.dat')
+    qe.parse_info('../../bn.save/')
+    qe.parse_wfc('../../bn.save/')
 
     # get the end time
     et = time.time()

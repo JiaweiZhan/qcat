@@ -7,6 +7,7 @@ import pickle
 from mpi4py import MPI
 import time
 import pathlib
+import shutil
 from .io import Read
 
 class QERead(Read):
@@ -15,7 +16,7 @@ class QERead(Read):
         self.xml_data = None
         self.comm = comm
 
-    def parse_info(self, file_name, store=True, storeFolder='./wfc/'):
+    def parse_info(self, saveFolder, store=True, storeFolder='./wfc/'):
         """
         analyze QE data-file-schema.xml
             param:
@@ -36,6 +37,9 @@ class QERead(Read):
             self.comm.Barrier()
         # unit convert
         hartree2ev = 27.2114
+
+        #get data-file-schema.xml
+        file_name = [saveFolder + '/' + file for file in os.listdir(saveFolder) if 'data-file-schema' in file][0]
 
         file = minidom.parse(file_name)
         # cell

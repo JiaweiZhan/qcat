@@ -66,7 +66,7 @@ if __name__ == "__main__":
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
 
         qe = qe_io.QERead()
-        xml_data = qe.parse_info(args.save_folder + '/data-file-schema.xml', store=False)
+        xml_data = qe.parse_info(args.save_folder, store=False)
         cell = xml_data['cell']
         z_length = np.linalg.norm(cell[-1])
         utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=z_length, picName='ldos.pdf')
