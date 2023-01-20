@@ -4,3 +4,6 @@ ldos.*
 wfc*/
 lf*/
 rcc-*
+build
+dist
+*.egg-info

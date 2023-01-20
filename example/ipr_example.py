@@ -8,8 +8,8 @@ from tqdm import tqdm
 import numpy as np
 import shutil, os, sys
 
-module_path = os.path.abspath('../')
-sys.path.append(module_path)
+# module_path = os.path.abspath('../')
+# sys.path.append(module_path)
 from abinitioToolKit import qbox_io
 from abinitioToolKit import utils
 
