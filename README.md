@@ -18,9 +18,15 @@ Computing [local density of states](https://en.wikipedia.org/wiki/Density_of_sta
 * `utils.py` includes some useful functions to output/analyze local band edge
 
 ### How to use
-#### Install Requirements
+#### Installation
 ```bash
-pip install -r requirements.txt
+conda create -n abinitioToolKit python=3.10
+conda activate abinitioToolKit
+python setup.py install
+```
+To update the package, please run:
+```bash
+pip install abinitioToolKit --upgrade
 ```
 #### Compute LDOS
 
@@ -28,11 +34,11 @@ pip install -r requirements.txt
 ```bash
 sinteractive --exclusive --partition=broadwl --nodes=1 --ntasks=28 --gres=gpu:0 --time=2:00:00
 ```
-2. Create a python file to call functions from **Library Files**
+2. Create a python file to call functions from **abinitioToolKit**
 ```python
-    import class_ldos
-    import qe_io
-    import utils
+    from abinitioToolKit import class_ldos
+    from abinitioToolKit import qe_io
+    from abinitioToolKit import utils
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
@@ -50,7 +56,7 @@ sinteractive --exclusive --partition=broadwl --nodes=1 --ntasks=28 --gres=gpu:0 
     if rank == 0:
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
 ```
-see [`ldos_example.py`](./ldos_example.py) for reference
+see [`example/ldos_example.py`](./example/ldos_example.py) for reference
 
 3. Run:
 ```
