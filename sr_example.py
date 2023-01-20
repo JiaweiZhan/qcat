@@ -3,10 +3,14 @@ from abinitioToolKit import qe_io
 from abinitioToolKit import utils
 from mpi4py import MPI
 import argparse
+from functools import partial
+import signal
 
 comm = MPI.COMM_WORLD
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, partial(utils.handler, comm))
+
     rank = comm.Get_rank()
     if rank == 0:
         utils.time_now()
@@ -23,13 +27,10 @@ if __name__ == "__main__":
     if not args.saveFileFolder:
         args.saveFileFolder = "./scf.save" 
 
-    if rank == 0:
-        print(f"configure:\
-                \n {''.join(['-'] * 41)}\
-                \n{'software':^20}:{args.abinitio:^20}\
-                \n{'saveFileFolder':^20}:{args.saveFileFolder:^20}\
-                \n {''.join(['-'] * 41)}\n\
-                ")
+    conf_tab = {"software": args.abinitio,
+                "saveFileFolder": args.saveFileFolder,
+                "MPI size": comm.Get_size()}
+    utils.print_conf(conf_tab)
 
     abinitioRead = None
     if args.abinitio.lower() == "qbox":

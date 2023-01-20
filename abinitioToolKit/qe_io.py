@@ -311,6 +311,9 @@ class QERead(Read):
                 pickle.dump(info_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         self.comm.Barrier()
 
+    def read(self, saveFileFolder, storeFolder, ):
+        self.parse_info(saveFolder=saveFileFolder, store=True, storeFolder='./wfc/')
+        self.parse_wfc(saveFolder=saveFileFolder, storeFolder=storeFolder)
 
     def info(self):
         rank = 0

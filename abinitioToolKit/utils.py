@@ -5,6 +5,7 @@ from scipy.signal import savgol_filter
 from mpi4py import MPI
 import pickle
 from tqdm import tqdm
+import shutil, os
 
 def time_now():
     now = datetime.datetime.now()
@@ -16,6 +17,29 @@ def time_now():
     print("* Date: %s"%now)
     print("=====================================================")
     return
+
+def print_conf(conf_tab):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank == 0:
+        print("configure:")
+        print(''.join(['-'] * 41))
+        for key, value in conf_tab.items():
+            print(f"{key:^20}: {str(value):^20}")
+        print(''.join(['-'] * 41))
+
+def handler(comm, signum, frame):
+    # handler for handle ctrl-C
+    rank = comm.Get_rank()
+    if rank == 0:
+        print("", end="\r", flush=True)
+        print("clean store file", flush=True)
+        isExist = os.path.exists('./wfc/')
+        if isExist:
+            print("cleand!", flush=True)
+            shutil.rmtree('./wfc/')
+    comm.Barrier()
+    comm.Abort(1)
 
 def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
     with open(fileName, 'w') as file_object:

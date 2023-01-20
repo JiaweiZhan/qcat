@@ -176,6 +176,10 @@ class QBOXRead(Read):
                 pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         return wfc_dict
 
+    def read(self, saveFileFolder, storeFolder, ):
+        self.parse_info(file_name=saveFileFolder, store=True, storeFolder='./wfc/')
+        self.parse_wfc(file_name=saveFileFolder, storeFolder=storeFolder)
+
     def info(self):
         print("----------------QBOX XML-------------------")
         print(f"{'cell':^10}:")

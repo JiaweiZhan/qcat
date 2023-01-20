@@ -1,6 +1,6 @@
 #!/scratch/midway2/jiaweiz/anaconda3/bin/python3
 import argparse
-import os, shutil
+import os
 import signal
 import numpy as np
 from abinitioToolKit.class_ldos import LDOS
@@ -8,24 +8,13 @@ from abinitioToolKit import qe_io
 from abinitioToolKit import utils
 from mpi4py import MPI
 import time
+from functools import partial
 
 comm = MPI.COMM_WORLD
 
-def handler(signum, frame):
-    # handler for handle ctrl-C
-    print("", end="\r", flush=True)
-    print("clean store file", flush=True)
-    rank = comm.Get_rank()
-    if rank == 0:
-        isExist = os.path.exists(LDOS.storeFolder)
-        if isExist:
-            shutil.rmtree(LDOS.storeFolder)
-    comm.Barrier()
-    exit(1)
-
 if __name__ == "__main__":
 
-    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGINT, partial(utils.handler, comm))
     # ----------------------------------Prepare------------------------------------
     rank = comm.Get_rank()
     if rank == 0:
@@ -45,13 +34,10 @@ if __name__ == "__main__":
     if not args.delta:
         args.delta = 0.001 
 
-    if rank == 0:
-        print(f"configure:\
-                \n {''.join(['-'] * 41)}\
-                \n{'QE save folder':^20}:{args.save_folder:^20}\
-                \n{'delta':^20}:{args.delta:^20}\
-                \n {''.join(['-'] * 41)}\n\
-                ")
+    conf_tab = {"QE save folder": args.save_folder,
+                "delta": args.delta,
+                "MPI size": comm.Get_size()}
+    utils.print_conf(conf_tab)
 
     # ---------------------------------Compute LDOS------------------------------------
 
