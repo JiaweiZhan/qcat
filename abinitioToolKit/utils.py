@@ -41,6 +41,31 @@ def handler(comm, signum, frame):
     comm.Barrier()
     comm.Abort(1)
 
+def read_alpha(alphaFile, npv):
+    epsilon = np.zeros(npv)
+    with open(alphaFile, 'r') as file_obj:
+        line = file_obj.readline()
+        index_line = 0
+        while line:
+            epsilon[:, :, index_line] = np.fromstring(line, sep=' ').reshape([npv[0], npv[1]])
+            line = file_obj.readline()
+            index_line += 1
+    assert(np.all(epsilon >= 1))
+    return epsilon
+
+def read_mu(spread_domain, domain_map):
+    mus = None
+    with open(spread_domain, 'r') as file_obj:
+        file_obj.readline()
+        line = file_obj.readline()
+        mus = np.fromstring(line, sep=' ')
+    mu_map = None
+    with open(domain_map, 'r') as file_obj:
+        grid = int(file_obj.readline())
+        line = file_obj.readline()
+        mu_map = np.fromstring(line, sep=' ').reshape([grid, grid, grid])
+    return mus, mu_map
+
 def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
     with open(fileName, 'w') as file_object:
         file_object.writelines("LVBM:\n")
