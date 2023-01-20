@@ -21,7 +21,8 @@ pip install abinitioToolKit --upgrade
 ## Documentation
 * `class_ldos.py` has the main class for computing local band edge (local CBM and VBM)
 * `qe_io.py` is a general I/O class to parse Quantum Espresso's binary output
-* `utils.py` includes some useful functions to output/analyze local band edge\\
+* `utils.py` includes some useful functions to output/analyze local band edge
+
 ......
 * browse **abinitioToolKit** for more information
 
