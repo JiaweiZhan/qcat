@@ -116,12 +116,16 @@ class QBOXRead(Read):
                     if encoding.strip() == "text":
                         wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
                         fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
-                        np.save(fileName, wfc_flatten.reshape(fftw))
+                        wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
+                        wfc = np.transpose(wfc, (2, 1, 0))
+                        np.save(fileName, wfc)
                     else:
                         wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
                         wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
                         fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
-                        np.save(fileName, wfc_flatten.reshape(fftw))
+                        wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
+                        wfc = np.transpose(wfc, (2, 1, 0))
+                        np.save(fileName, wfc)
                     if rank == 0:
                         value = size
                         if total_iter - index_mp < value:
@@ -174,6 +178,7 @@ class QBOXRead(Read):
         if rank == 0:
             with open(storeFolder + '/info.pickle', 'wb') as handle:
                 pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        self.comm.Barrier()
         return wfc_dict
 
     def read(self, saveFileFolder, storeFolder, ):
