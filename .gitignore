@@ -7,3 +7,4 @@ rcc-*
 build
 dist
 *.egg-info
+example/*.dat
