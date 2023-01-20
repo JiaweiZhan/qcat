@@ -116,6 +116,9 @@ def vint(fftw, cell):
     fftw: [np0v, np1v, np2v]
     cell: [[],[],[]]
     """
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
     b = np.zeros((3, 3))
     volume = abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
     fac = 2.0 * np.pi
@@ -125,13 +128,17 @@ def vint(fftw, cell):
     G_vec_norm = np.zeros(fftw)
     fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
     for i in range(fftw[0]):
-        index_i = fftFreq[0][i]
-        for j in range(fftw[1]):
-            index_j = fftFreq[1][j]
-            for k in range(fftw[2]):
-                index_k = fftFreq[2][k]
-                G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
-                G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+        if i % size == rank:
+            index_i = fftFreq[0][i]
+            for j in range(fftw[1]):
+                index_j = fftFreq[1][j]
+                for k in range(fftw[2]):
+                    index_k = fftFreq[2][k]
+                    G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
+                    G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm_global = np.zeros_like(G_vec_norm)
+    comm.Allreduce(G_vec_norm, G_vec_norm_global, op=MPI.SUM)
+    G_vec_norm = G_vec_norm_global
     index = np.argwhere(G_vec_norm == 0)
     G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [1] * index.shape[0]
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm
@@ -146,6 +153,9 @@ def vint_erfc(fftw, cell, mu):
     cell: [[],[],[]]
     mu: 0.65
     """
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
     b = np.zeros((3, 3))
     volume = np.abs(np.dot(cell[0], np.cross(cell[1], cell[2])))
     fac = 2.0 * np.pi
@@ -155,13 +165,17 @@ def vint_erfc(fftw, cell, mu):
     G_vec_norm = np.zeros(fftw)
     fftFreq = [[int(num) for num in np.fft.fftfreq(fftw[i]) * fftw[i]] for i in range(3)]
     for i in range(fftw[0]):
-        index_i = fftFreq[0][i]
-        for j in range(fftw[1]):
-            index_j = fftFreq[1][j]
-            for k in range(fftw[2]):
-                index_k = fftFreq[2][k]
-                G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
-                G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+        if i % size == rank:
+            index_i = fftFreq[0][i]
+            for j in range(fftw[1]):
+                index_j = fftFreq[1][j]
+                for k in range(fftw[2]):
+                    index_k = fftFreq[2][k]
+                    G_vec = index_i * b[0] + index_j * b[1] + index_k * b[2]
+                    G_vec_norm[i, j, k] = np.linalg.norm(G_vec) ** 2
+    G_vec_norm_global = np.zeros_like(G_vec_norm)
+    comm.Allreduce(G_vec_norm, G_vec_norm_global, op=MPI.SUM)
+    G_vec_norm = G_vec_norm_global
     index = np.argwhere(G_vec_norm == 0)
     G_vec_norm[index[:, 0], index[:, 1], index[:, 2]] = [1] * index.shape[0]
     G_vec_norm = 4.0 * np.pi / volume  / G_vec_norm * (1.0 - np.exp(-G_vec_norm / 4.0 / mu ** 2))
