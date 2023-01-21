@@ -34,7 +34,9 @@ def visualize_func(func, zoom_factor=0.5, fileName = "./func.dat"):
     rank = comm.Get_rank()
     if rank == 0:
         func = ndimage.zoom(func, zoom_factor)
+        func = np.where(func >= 0, func, 0)
         with open(fileName, 'w') as file_obj:
+            file_obj.write("\n")
             file_obj.write(' '.join([str(num) for num in list(func.shape)]) + '\n')
             index = 0
             for iz in range(func.shape[2]):
