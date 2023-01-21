@@ -10,6 +10,8 @@ abinitioToolKit is a tool for analyzing data from quantum chemistry softwares.
 
 ## Installation
 ```bash
+# loading a system-provided MPI module (openmpi or intelmpi)
+module load intelmpi/2019.up7+intel-19.1.1
 conda create -n abinitioToolKit python=3.10
 conda activate abinitioToolKit
 python setup.py install
@@ -36,6 +38,8 @@ Computing [local density of states](https://en.wikipedia.org/wiki/Density_of_sta
 1. ssh to interactive session to utilize computing node (1 node is enough)
 ```bash
 sinteractive --exclusive --partition=broadwl --nodes=1 --ntasks=28 --gres=gpu:0 --time=2:00:00
+# loading a system-provided MPI module (openmpi or intelmpi)
+module load intelmpi/2019.up7+intel-19.1.1
 ```
 2. Create a python file to call functions from **abinitioToolKit**
 ```python
