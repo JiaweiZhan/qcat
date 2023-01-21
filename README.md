@@ -14,7 +14,7 @@ abinitioToolKit is a tool for analyzing data from quantum chemistry softwares.
 module load intelmpi/2019.up7+intel-19.1.1
 conda create -n abinitioToolKit python=3.10
 conda activate abinitioToolKit
-python setup.py install
+pip install .
 ```
 To update the package, please run:
 ```bash

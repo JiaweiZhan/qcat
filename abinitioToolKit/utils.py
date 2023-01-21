@@ -6,6 +6,7 @@ from mpi4py import MPI
 import pickle
 from tqdm import tqdm
 import shutil, os
+from scipy import ndimage
 
 def time_now():
     now = datetime.datetime.now()
@@ -27,6 +28,24 @@ def print_conf(conf_tab):
         for key, value in conf_tab.items():
             print(f"{key:^20}: {str(value):^20}")
         print(''.join(['-'] * 41))
+
+def visualize_func(func, zoom_factor=0.5, fileName = "./func.dat"):
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    if rank == 0:
+        func = ndimage.zoom(func, zoom_factor)
+        with open(fileName, 'w') as file_obj:
+            file_obj.write(' '.join([str(num) for num in list(func.shape)]) + '\n')
+            index = 0
+            for iz in range(func.shape[2]):
+                for iy in range(func.shape[1]):
+                    for ix in range(func.shape[0]):
+                        file_obj.write(f"{func[ix, iy, iz]:^15.4e}")
+                        index += 1
+                        if index % 5 == 0:
+                            file_obj.write("\n")
+    comm.Barrier()
+
 
 def handler(comm, signum, frame):
     # handler for handle ctrl-C
