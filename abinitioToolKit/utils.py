@@ -222,10 +222,8 @@ def factorizable(n):
 def local_contribution(read_obj, saveFileFolder, comm, storeFolder='./wfc/'):
     rank = comm.Get_rank()
     size = comm.Get_size()
-    read_obj.parse_info(saveFileFolder)
-    read_obj.parse_wfc(saveFileFolder, storeFolder=storeFolder)
+    read_obj.read(saveFileFolder=saveFileFolder, storeFolder=storeFolder)
 
-    comm.Barrier()
     with open(storeFolder + '/info.pickle', 'rb') as handle:
         info_data = pickle.load(handle)
 
@@ -237,16 +235,10 @@ def local_contribution(read_obj, saveFileFolder, comm, storeFolder='./wfc/'):
     cell = info_data['cell']
     fftw = info_data['fftw']
     occ = info_data['occ']
+    nks = info_data['nks']
     fileNameList = info_data['wfc_file']
 
-    # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
-    try:
-        nbnd[0]
-    except TypeError:
-        nbnd = [nbnd] * nspin
-    if len(occ.shape) == 3:
-        occ = occ[:, 0, :]
-        fileNameList = fileNameList[:, 0, :]
+    # TODO: 1. qe has no different nbnd
 
     v_g = vint(fftw, cell)
     v_g_mu = vint_erfc(fftw, cell, mu=0.71)
@@ -258,19 +250,19 @@ def local_contribution(read_obj, saveFileFolder, comm, storeFolder='./wfc/'):
             pbar = tqdm(desc=f'compute local contri. for spin:{ispin + 1:^3}/{nspin:^3}', total=total_iter)
         for ibnd_i in range(nbnd[ispin]): 
             if ibnd_i % size == rank:
-                fileName = fileNameList[ispin, ibnd_i]
-                wfc_i = np.load(fileName)
-                for ibnd_j in range(ibnd_i, nbnd[ispin]): 
-                    # fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(ibnd_j + 1).zfill(5) + '_r' + '.npy'
-                    fileName = fileNameList[ispin, ibnd_j]
-                    wfc_j = np.load(fileName)
-                    wfc_ij = wfc_i * wfc_j
-                    wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
-                    factor = 1.0
-                    if ibnd_i != ibnd_j:
-                        factor = 2.0
-                    lower_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j] * occ[ispin, ibnd_i] )
-                    upper_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g_mu * wfc_ij_g, norm='forward')) * occ[ispin, ibnd_j] * occ[ispin, ibnd_i] )
+                for iks in range(nks):
+                    fileName = fileNameList[ispin, iks, ibnd_i]
+                    wfc_i = np.load(fileName)
+                    for ibnd_j in range(ibnd_i, nbnd[ispin]): 
+                        fileName = fileNameList[ispin, iks, ibnd_j]
+                        wfc_j = np.load(fileName)
+                        wfc_ij = wfc_i * wfc_j
+                        wfc_ij_g = np.fft.fftn(wfc_ij, norm='forward') 
+                        factor = 1.0
+                        if ibnd_i != ibnd_j:
+                            factor = 2.0
+                        lower_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g * wfc_ij_g, norm='forward')) * occ[ispin, iks, ibnd_j] * occ[ispin, iks, ibnd_i] )
+                        upper_chunk += factor * np.sum(wfc_ij * np.real(np.fft.ifftn(v_g_mu * wfc_ij_g, norm='forward')) * occ[ispin, iks, ibnd_j] * occ[ispin, iks, ibnd_i] )
                 if rank == 0:
                     value = size
                     if nbnd[ispin] - ibnd_i < value:

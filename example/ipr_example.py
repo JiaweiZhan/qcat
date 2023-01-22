@@ -8,8 +8,6 @@ from tqdm import tqdm
 import numpy as np
 import shutil, os, sys
 
-# module_path = os.path.abspath('../')
-# sys.path.append(module_path)
 from abinitioToolKit import qbox_io
 from abinitioToolKit import utils
 
@@ -25,11 +23,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--saveFileFolder", type=str,
-            help="output From QC software: .xml for Qbox. Default: ./gs.gs.xml")
+            help="folder that store XML sample and qbox.out. Default: ../")
     args = parser.parse_args()
 
     if not args.saveFileFolder:
-        args.saveFileFolder = "./gs.gs.xml" 
+        args.saveFileFolder = "../" 
 
     conf_tab = {"saveFileFolder": args.saveFileFolder,
                 "MPI size": comm.Get_size()}
@@ -63,10 +61,6 @@ if __name__ == "__main__":
     fileNameList = info_data['wfc_file']
 
     # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
-    try:
-        nbnd[0]
-    except TypeError:
-        nbnd = [nbnd] * nspin
     if len(fileNameList.shape) == 3:
         fileNameList = fileNameList[:, 0, :]
 

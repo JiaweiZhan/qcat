@@ -61,7 +61,7 @@ class QERead(Read):
         nbnd_up, nbnd_dw, nbnd = -1, -1, -1
         nbnd_nodes = file.getElementsByTagName('nbnd')
         try: 
-            nbnd = int(nbnd_nodes[0].firstChild.data)
+            nbnd = [int(nbnd_nodes[0].firstChild.data)]
         except IndexError:
             pass
         if nspin == 2:
@@ -73,7 +73,7 @@ class QERead(Read):
                 assert(nbnd == nbnd_dw and nbnd == nbnd_up)
             else:
                 assert(nbnd_up == nbnd_dw)
-                nbnd = nbnd_dw
+                nbnd = [nbnd_dw] * 2
 
         # fermi energy
         fermi_nodes = file.getElementsByTagName('fermi_energy')
@@ -84,7 +84,7 @@ class QERead(Read):
         nks = int(nks_nodes[0].firstChild.data)
      
         # [nspin * nks * nbnd]
-        eigenvalues, occupations, weights = np.zeros((nspin, nks, nbnd)), np.zeros((nspin, nks, nbnd)), np.zeros(nks)
+        eigenvalues, occupations, weights = np.zeros((nspin, nks, nbnd[0])), np.zeros((nspin, nks, nbnd[0])), np.zeros(nks)
 
         ks_nodes = file.getElementsByTagName('ks_energies')
         for index, ks_node in enumerate(ks_nodes):
@@ -97,7 +97,7 @@ class QERead(Read):
             eigenvalue_ = eigens_node[0].firstChild.data
             eigenvalue_ = [float(num) * hartree2ev for num in eigenvalue_.split()]
             for ispin in range(nspin):
-                eigenvalues[ispin, index, :] = eigenvalue_[ispin * nbnd : (ispin + 1) * nbnd]
+                eigenvalues[ispin, index, :] = eigenvalue_[ispin * nbnd[ispin] : (ispin + 1) * nbnd[ispin]]
 
             # occupation
             # occ_nodes = ks_node.getElementsByTagName('occupations')
@@ -295,7 +295,7 @@ class QERead(Read):
             fileNameList_sp = [] 
             for ik in range(self.xml_data['nks']):
                 fileNameList_ik = [] 
-                for iwf in range(self.xml_data['nbnd']):
+                for iwf in range(self.xml_data['nbnd'][isp]):
                     fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(ik + 1).zfill(3) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
                     fileNameList_ik.append(fileName)
                 fileNameList_sp.append(fileNameList_ik)

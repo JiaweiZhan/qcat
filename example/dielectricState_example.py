@@ -23,13 +23,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--saveFileFolder", type=str,
-            help="output From QC software: .xml for Qbox. Default: ./gs.gs.xml")
+            help="folder that store XML sample and qbox.out. Default: ../")
     parser.add_argument("-a", "--alphaFile", type=str,
             help="Local Dielectric Function File. Default: ../alpha.txt")
     args = parser.parse_args()
 
     if not args.saveFileFolder:
-        args.saveFileFolder = "./gs.gs.xml" 
+        args.saveFileFolder = "../" 
     if not args.alphaFile:
         args.alphaFile = "../alpha.txt" 
 
@@ -66,10 +66,6 @@ if __name__ == "__main__":
     fileNameList = info_data['wfc_file']
 
     # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
-    try:
-        nbnd[0]
-    except TypeError:
-        nbnd = [nbnd] * nspin
     if len(fileNameList.shape) == 3:
         fileNameList = fileNameList[:, 0, :]
 

@@ -5,10 +5,11 @@ import threading
 from . import qe_io
 import shutil
 from mpi4py import MPI
+import pickle
 
 class LDOS:
 
-    def __init__(self, delta=0.001, saveFolder='./scf.save', comm=None):
+    def __init__(self, read_obj, delta=0.001, saveFolder='./scf.save', comm=None):
         """
         Init LDOS class:
             param:
@@ -23,6 +24,7 @@ class LDOS:
         self.saveFolder = saveFolder
         self.storeFolder = './wfc/'
         self.comm = comm
+        self.read_obj = read_obj
 
     def computeLDOS(self, storeFolder='./wfc'):
 
@@ -31,11 +33,13 @@ class LDOS:
         if not self.comm is None:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
-        qe = qe_io.QERead(self.comm)
-        xml_data = qe.parse_info(self.saveFolder)
+        self.read_obj.read(saveFileFolder=self.saveFolder, storeFolder=self.storeFolder)
+
+        with open(storeFolder + '/info.pickle', 'rb') as handle:
+            xml_data = pickle.load(handle)
+
         numOcc = xml_data['occ']
         kWeights = xml_data['kweights']
-        nbnd = xml_data['nbnd']
         eigens = xml_data['eigen']
         nspin = numOcc.shape[0]
         nks = numOcc.shape[1]
@@ -53,8 +57,6 @@ class LDOS:
 
         ksStateZAve_loc = np.zeros((nspin, nks, nbnd, fft_grid[2]), dtype=np.double)
 
-        qe.parse_wfc(self.saveFolder, storeFolder=storeFolder)
-
         wfcStored = [name for name in os.listdir(storeFolder) if "wfc" in name]
 
         for index, fileName in enumerate(wfcStored):
@@ -66,9 +68,9 @@ class LDOS:
                 evc_r = np.load(wfcName)
                 ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
 
-        self.comm.Barrier()
-        if rank == 0:
-            shutil.rmtree(storeFolder)
+        # self.comm.Barrier()
+        # if rank == 0:
+        #     shutil.rmtree(storeFolder)
         ksStateZAve = np.zeros_like(ksStateZAve_loc)
         self.comm.Allreduce(ksStateZAve_loc, ksStateZAve)
 

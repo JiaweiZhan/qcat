@@ -17,11 +17,41 @@ class QBOXRead(Read):
     def __init__(self, comm=None):
         self.wfc_data = None
         self.comm = comm
+        self.qboxOut = None
+        self.xmlSample = None
+        self.eigens = []
 
-    def parse_info(self, file_name=None, store=True, storeFolder='./wfc/'):
-        pass
+    def parse_info(self, saveFileFolder, store=True, storeFolder='./wfc/'):
+        """
+        determine which file is qbox.out, which file is XML
+        by looking at the second line of file
+        """
+        files = os.listdir(saveFileFolder)
+        files = [f for f in files if os.path.isfile(saveFileFolder+'/'+f)]
+        for file_ in files:
+            fin = open(saveFileFolder + '/' + file_, "r")
+            fin.readline()
+            line = fin.readline()
+            if "fpmd:sample" in line:
+                self.xmlSample = saveFileFolder + '/' + file_
+            elif "fpmd:simulation" in line:
+                self.qboxOut = saveFileFolder + '/' + file_
+            fin.close()
+        assert (self.qboxOut is not None and self.xmlSample is not None)
+        context = etree.iterparse(self.qboxOut, huge_tree=True, tag="eigenset")
+        for _, element in context:
+            eigen_context = element.getchildren() 
+            for subele in eigen_context:
+                ispin = int(subele.get('spin'))
+                if len(self.eigens) <= ispin:
+                    self.eigens.append(list(np.fromstring(subele.text, sep=' ')))
+                else:
+                    self.eigens[ispin] = list(np.fromstring(subele.text, sep=' ')) 
+        if len(self.eigens) == 2:
+            assert (len(self.eigens[0]) == len(self.eigens[1]))
 
-    def parse_wfc(self, file_name, storeFolder='./wfc/'):
+
+    def parse_wfc(self, file_name=None, storeFolder='./wfc/'):
         """
         analyze qbox sample xml files 
             param:
@@ -41,9 +71,12 @@ class QBOXRead(Read):
         if not self.comm is None:
             self.comm.Barrier()
 
-        context = etree.iterparse(file_name, huge_tree=True, events=('start', 'end'))
+        context = etree.iterparse(self.xmlSample, huge_tree=True, events=('start', 'end'))
 
         ispin, iwfc = 0, 0
+        nks = 1
+        weights = np.ones(nks)
+        eigenvalues = np.array(self.eigens)[:, np.newaxis, :]
         cell = np.zeros((3, 3))
         b = np.zeros((3, 3))
         fftw = np.zeros(3, dtype=np.int32)
@@ -84,26 +117,32 @@ class QBOXRead(Read):
 
                 occ = np.zeros((nspin, max(nbnd)), dtype=np.int32)
                 if nspin == 1:
-                    occ[nspin - 1, :nel // 2] = 2
-                    occ[nspin - 1, nel // 2: nel // 2 + nel % 2] = 1
+                    occ[nspin - 1, :nel // 2] = 1
+                    occ[nspin - 1, nel // 2: nel // 2 + nel % 2] = 0.5
                 else:
                     # spin up
                     occ[0, :(nel + 1) // 2] = 1
                     # spin down
                     occ[1, :nel // 2] = 1
+                occ = occ[:, np.newaxis, :]
             element.clear()
 
-        context = etree.iterparse(file_name, huge_tree=True)
+        context = etree.iterparse(self.xmlSample, huge_tree=True)
 
         index_mp = 0
+
         fileNameList_tot = [] 
         for isp in range(nspin):
             fileNameList_sp = [] 
-            for iwf in range(nbnd[isp]):
-                fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
-                fileNameList_sp.append(fileName)
+            for ik in range(nks):
+                fileNameList_ik = [] 
+                for iwf in range(nbnd[isp]):
+                    fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(ik + 1).zfill(3) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
+                    fileNameList_ik.append(fileName)
+                fileNameList_sp.append(fileNameList_ik)
             fileNameList_tot.append(fileNameList_sp)
         fileNameList_tot = np.array(fileNameList_tot)
+
         if rank == 0:
             total_iter = np.sum(nbnd)
             pbar = tqdm(desc='store wfc', total=total_iter)
@@ -115,14 +154,14 @@ class QBOXRead(Read):
                     dtype = np.double
                     if encoding.strip() == "text":
                         wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
                         wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
                         wfc = np.transpose(wfc, (2, 1, 0))
                         np.save(fileName, wfc)
                     else:
                         wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
                         wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
                         wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
                         wfc = np.transpose(wfc, (2, 1, 0))
                         np.save(fileName, wfc)
@@ -164,12 +203,15 @@ class QBOXRead(Read):
 
         wfc_dict = {'cell': cell,
                     'b': b,
+                    'nks': nks,
                     'ecut': ecut,
                     'volume': volume,
                     'nspin': nspin,
                     'nbnd': nbnd,
+                    'eigen': eigenvalues,
                     'nel': nel,
                     'nempty': nempty,
+                    'kweights': weights,
                     'occ': occ,
                     'fftw': fftw,
                     'npv': npv,
@@ -182,7 +224,7 @@ class QBOXRead(Read):
         return wfc_dict
 
     def read(self, saveFileFolder, storeFolder, ):
-        self.parse_info(file_name=saveFileFolder, store=True, storeFolder='./wfc/')
+        self.parse_info(saveFileFolder=saveFileFolder, store=True, storeFolder='./wfc/')
         self.parse_wfc(file_name=saveFileFolder, storeFolder=storeFolder)
 
     def info(self):
@@ -234,20 +276,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-x", "--xml", type=str,
-            help="XML sample generated by qbox. Default: ../gs.gs.xml")
+            help="folder where qbox.out and XML sample files are in. Default: ../")
     parser.add_argument("-s", "--storeFolder", type=str,
             help="store wfc in Folder. Default: ./wfc/")
     args = parser.parse_args()
 
     # default values
     if not args.xml:
-        args.xml = "../gs.gs.xml"
+        args.xml = "../"
     if not args.storeFolder:
         args.storeFolder = "./wfc/"
     if rank == 0:
         print(f"configure:\
                 \n {''.join(['-'] * 41)}\
-                \n{'Qbox sample file':^20}:{args.xml:^20}\
+                \n{'Qbox save folder':^20}:{args.xml:^20}\
                 \n{'wfc storeFolder':^20}:{args.storeFolder:^20}\
                 \n {''.join(['-'] * 41)}\n\
                 ")
@@ -256,7 +298,8 @@ if __name__ == "__main__":
     st = time.time()
 
     qbox = QBOXRead(comm=comm)
-    qbox.parse_wfc(args.xml)
+    qbox.parse_info(args.xml)
+    qbox.parse_wfc()
 
     # get the end time
     et = time.time()
