@@ -9,3 +9,5 @@ dist
 *.egg-info
 example/*.dat
 example/ldos.*
+example/sub_qb
+example/rcc-*
