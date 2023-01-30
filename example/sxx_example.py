@@ -85,7 +85,7 @@ if __name__ == "__main__":
         die_feel = np.zeros(nbnd[ispin])
         if rank == 0:
             total_iter = nbnd[ispin]
-            pbar = tqdm(desc=f'compute dielectric. for spin:{ispin + 1:^3}/{nspin:^3}', total=total_iter)
+            pbar = tqdm(desc=f'compute SXX. for spin:{ispin + 1:^3}/{nspin:^3}', total=total_iter)
         for ibnd_i in range(nbnd[ispin]): 
             fileName = fileNameList[ispin, ibnd_i]
             wfc_i = np.load(fileName)
