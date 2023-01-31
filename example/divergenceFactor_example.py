@@ -77,6 +77,7 @@ if __name__ == "__main__":
     alpha = np.where(alpha >= 1, alpha, 1)
 
     delta = 1e-7
+    up_tot, down_tot = 0, 0
     for ispin in range(nspin):
         die_feel = np.zeros(nbnd[ispin])
         if rank == 0:
@@ -97,6 +98,8 @@ if __name__ == "__main__":
 
             up = comm.allreduce(up)
             down = comm.allreduce(down)
+            up_tot += up
+            down_tot += down
             down += delta
             die_feel[ibnd_i] = up / down
 
@@ -110,5 +113,6 @@ if __name__ == "__main__":
                 print(f"spin: {ispin} / {nspin}|| band ind:{str(ibnd_i + 1):^10}: {die_feel[ibnd_i]:10.5f}")
     comm.Barrier()
     if rank == 0:
+        print(f"DivergenceFactor: {up_tot / down_tot: 10.5f}")
         shutil.rmtree(storeFolder)
 
