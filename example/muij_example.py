@@ -120,6 +120,13 @@ if __name__ == "__main__":
                         sys.stdout.write("\n")
                 sys.stdout.write("\n")
 
+        if rank == 0:
+            # output mu_intact.dat
+            with open("./ExxMu" + str(ispin + 1) + ".dat", "wb") as file_obj:
+                file_obj.write(bytes(np.array([nbnd[ispin]], dtype=np.int32)))
+                mu_ij_global.tofile(file_obj)
+        comm.Barrier()
+
     comm.Barrier()
     if rank == 0:
         shutil.rmtree(storeFolder)
