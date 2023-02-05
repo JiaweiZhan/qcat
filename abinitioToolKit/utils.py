@@ -87,6 +87,39 @@ def read_mu(spread_domain, domain_map):
         mu_map = np.fromstring(line, sep=' ').reshape([grid, grid, grid])
     return mus, mu_map
 
+def read_rho(rho_file):
+    file_name = rho_file
+    npv = []
+    rho = []
+    with open(file_name, 'r') as file_object:
+        for _ in range(2):
+            file_object.readline()
+
+        num_wannier = int(file_object.readline().split()[0])
+        for _ in range(3):
+            npv.append(int(file_object.readline().split()[0]))
+
+        for _ in range(num_wannier):
+            file_object.readline()
+
+        rho_line = file_object.readline()
+        while rho_line:
+            row_ = rho_line.split()
+            for num in row_:
+                rho.append(float(num))
+
+            rho_line = file_object.readline()
+
+    rho = np.array(rho)
+    rho.resize(npv)
+    # rotate
+    rho = np.roll(rho, rho.shape[0] // 2, axis=0)
+    rho = np.roll(rho, rho.shape[1] // 2, axis=1)
+    rho = np.roll(rho, rho.shape[2] // 2, axis=2)
+
+    mu = (3 * rho / np.pi) ** (1/6)
+    return rho, mu
+
 def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
     with open(fileName, 'w') as file_object:
         file_object.writelines("LVBM:\n")
