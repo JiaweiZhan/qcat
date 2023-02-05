@@ -3,6 +3,7 @@
 ldos.*
 wfc*/
 lf*/
+test*/
 rcc-*
 build
 dist

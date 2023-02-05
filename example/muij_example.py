@@ -73,9 +73,16 @@ if __name__ == "__main__":
         occ = occ[:, 0, :]
 
     rho, mu = utils.read_rho(args.rhoFile)
+
+    if rank == 0:
+        # output mu_intact.dat
+        with open("./intactMu.dat", "wb") as file_obj:
+            file_obj.write(bytes(fftw))
+            mu.tofile(file_obj)
+    comm.Barrier()
+
     mu = zoom(mu, fftw * 1.0 / npv, mode='wrap')
 
-    delta = 1e-7
     for ispin in range(nspin):
         mu_ij = np.zeros((nbnd[ispin], nbnd[ispin]))
         if rank == 0:
