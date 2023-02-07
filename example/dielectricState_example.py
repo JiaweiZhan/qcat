@@ -66,8 +66,6 @@ if __name__ == "__main__":
     fileNameList = info_data['wfc_file']
 
     # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
-    if len(fileNameList.shape) == 3:
-        fileNameList = fileNameList[:, 0, :]
 
     alphaFile = args.alphaFile 
     alpha = utils.read_alpha(alphaFile=alphaFile, npv=npv)
@@ -81,7 +79,7 @@ if __name__ == "__main__":
             pbar = tqdm(desc=f'compute dielectric. for spin:{ispin + 1:^3}/{nspin:^3}', total=total_iter)
         for ibnd_i in range(nbnd[ispin]): 
             if ibnd_i % size == rank:
-                fileName = fileNameList[ispin, ibnd_i]
+                fileName = fileNameList[ispin][0, ibnd_i]
                 wfc_i = np.load(fileName)
                 wfc_i = np.absolute(wfc_i) ** 2
                 die_feel[ibnd_i] = np.sum(1.0 / alpha * wfc_i) / np.sum(wfc_i)
