@@ -47,8 +47,6 @@ class QBOXRead(Read):
                     self.eigens.append(list(np.fromstring(subele.text, sep=' ')))
                 else:
                     self.eigens[ispin] = list(np.fromstring(subele.text, sep=' ')) 
-        if len(self.eigens) == 2:
-            assert (len(self.eigens[0]) == len(self.eigens[1]))
 
 
     def parse_wfc(self, file_name=None, storeFolder='./wfc/'):
@@ -73,17 +71,21 @@ class QBOXRead(Read):
 
         context = etree.iterparse(self.xmlSample, huge_tree=True, events=('start', 'end'))
 
-        ispin, iwfc = 0, 0
         nks = 1
         weights = np.ones(nks)
-        eigenvalues = np.array(self.eigens)[:, np.newaxis, :]
+        eigenvalues = {}
+        for ispin in range(len(self.eigens)):
+            eigenvalues[ispin] = []
         cell = np.zeros((3, 3))
         b = np.zeros((3, 3))
         fftw = np.zeros(3, dtype=np.int32)
         volume = 0
         nspin, ecut, nel, nempty, nbnd = 0, 0, 0, 0, None
-        occ = None
+        occ = {}
+        for ispin in range(len(self.eigens)):
+            occ[ispin] = []
         encoding = "text"
+        ispin, iwfc = 0, 0
 
         # several necessary configuration
         for event, element in context:
@@ -115,23 +117,25 @@ class QBOXRead(Read):
                     nbnd[0] = (nel + 1) // 2 + nempty
                     nbnd[1] = (nel) // 2 + nempty
 
-                occ = np.zeros((nspin, max(nbnd)), dtype=np.int32)
+                for key in occ.keys():
+                    occ[key] = np.zeros(nbnd[int(key)], dtype=np.int32)
                 if nspin == 1:
-                    occ[nspin - 1, :nel // 2] = 1
-                    occ[nspin - 1, nel // 2: nel // 2 + nel % 2] = 0.5
+                    occ[0][:nel // 2] = 1
+                    occ[0][nel // 2: nel // 2 + nel % 2] = 0.5
                 else:
                     # spin up
-                    occ[0, :(nel + 1) // 2] = 1
+                    occ[0][:(nel + 1) // 2] = 1
                     # spin down
-                    occ[1, :nel // 2] = 1
-                occ = occ[:, np.newaxis, :]
+                    occ[1][:nel // 2] = 1
+                for key in occ.keys():
+                    occ[key] = occ[key][np.newaxis, :]
             element.clear()
 
         context = etree.iterparse(self.xmlSample, huge_tree=True)
 
         index_mp = 0
 
-        fileNameList_tot = [] 
+        fileNameList_tot = {}
         for isp in range(nspin):
             fileNameList_sp = [] 
             for ik in range(nks):
@@ -140,8 +144,7 @@ class QBOXRead(Read):
                     fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(ik + 1).zfill(3) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
                     fileNameList_ik.append(fileName)
                 fileNameList_sp.append(fileNameList_ik)
-            fileNameList_tot.append(fileNameList_sp)
-        fileNameList_tot = np.array(fileNameList_tot)
+            fileNameList_tot[isp] = np.array(fileNameList_sp)
 
         if rank == 0:
             total_iter = np.sum(nbnd)
