@@ -130,6 +130,14 @@ class QBOXRead(Read):
                 for key in occ.keys():
                     occ[key] = occ[key][np.newaxis, :]
             element.clear()
+        species_loc = []
+        context = etree.iterparse(self.xmlSample, tag="atom")
+        for _, element in context:
+            species = element.get("species")
+            for subele in list(element):
+                if subele.tag == "position":
+                    position = [float(num) for num in subele.text.split()]
+                    species_loc.append([species] + position)
 
         context = etree.iterparse(self.xmlSample, huge_tree=True)
 
@@ -149,6 +157,7 @@ class QBOXRead(Read):
         if rank == 0:
             total_iter = np.sum(nbnd)
             pbar = tqdm(desc='store wfc', total=total_iter)
+
         for event, element in context:
             if element.tag == "grid_function":
                 encoding = element.get("encoding")
@@ -218,6 +227,7 @@ class QBOXRead(Read):
                     'occ': occ,
                     'fftw': fftw,
                     'npv': npv,
+                    'atompos': species_loc,
                     'wfc_file': fileNameList_tot}
         self.wfc_data = wfc_dict
         if rank == 0:
