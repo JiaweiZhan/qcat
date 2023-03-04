@@ -79,6 +79,15 @@ class QERead(Read):
         fermi_nodes = file.getElementsByTagName('fermi_energy')
         fermiEne = float(fermi_nodes[0].firstChild.data) * hartree2ev
 
+        # atomic positions 
+        species_loc = []
+        atomic_nodes = file.getElementsByTagName('atomic_positions')
+        atom_nodes = atomic_nodes[-1].getElementsByTagName('atom')
+        for atom_node in atom_nodes:
+            species = atom_node.attributes['name'].value
+            loc = [float(num) for num in atom_node.firstChild.data.split()]
+            species_loc.append([species] + loc)
+
         # num of kpoints
         nks_nodes = file.getElementsByTagName('nks')
         nks = int(nks_nodes[0].firstChild.data)
@@ -117,6 +126,7 @@ class QERead(Read):
         np2v = int(fft_nodes[0].attributes['nr3'].value)
         fftw = np.array([np0v, np1v, np2v]) // 2 + 1 
         out_dict = {'cell': cell,
+                    "atompos": species_loc,
                     'nspin': nspin,
                     'nks': nks,
                     'fermi': fermiEne,
@@ -327,7 +337,7 @@ class QERead(Read):
             print(f"{'occupation':^10}:")
             print(self.xml_data['occ'])
             print('\n')
-            print(f"{'nbnd':^10}: {self.xml_data['nbnd']:10.5f}")
+            print(f"{'nbnd':^10}: {self.xml_data['nbnd']}")
             print(f"{'nspin':^10}: {self.xml_data['nspin']:10.5f}")
             print(f"{'nks':^10}: {self.xml_data['nks']:10.5f}")
             print(f"{'fermiEne':^10}: {self.xml_data['fermi']:10.5f}")
@@ -355,8 +365,8 @@ if __name__ == "__main__":
     st = time.time()
     comm = MPI.COMM_WORLD
     qe = QERead(comm)
-    qe.parse_info("../8bvo_6feooh_nspin2_hdf5.save/data-file-schema.xml")
-    qe.parse_wfc("../8bvo_6feooh_nspin2_hdf5.save/wfcup1.hdf5")
+    qe.parse_info("/project/gagalli/jiaweiz/test/TEST_WEST/tutorials/h-bn/vacuum_extrapolate/vacuum_20/hbn.save/")
+    # qe.parse_wfc("../8bvo_6feooh_nspin2_hdf5.save")
     qe.info()
     rank = comm.Get_rank()
     # get the end time
