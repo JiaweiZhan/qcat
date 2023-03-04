@@ -83,7 +83,7 @@ if __name__ == "__main__":
     # TODO: 1. Qbox has no k point; 2. qe has no different nbnd
 
     for ispin in range(nspin):
-        fileName = fileNameList[ispin, args.kpointIndex - 1, args.bandIndex - 1]
+        fileName = fileNameList[ispin][args.kpointIndex - 1, args.bandIndex - 1]
         wfc = np.load(fileName)
         fileName = str(ispin + 1) + "_" + str(args.kpointIndex).zfill(3) + "_" + str(args.bandIndex).zfill(5) + ".dat"
         utils.visualize_func(np.absolute(wfc) ** 2, zoom_factor=0.5, fileName=fileName)
