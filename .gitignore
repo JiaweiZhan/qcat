@@ -12,3 +12,5 @@ example/*.dat
 example/ldos.*
 example/sub_qb
 example/rcc-*
+example/*.vasp
+example/.ipynb_checkpoints/*
