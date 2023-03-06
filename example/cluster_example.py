@@ -112,7 +112,7 @@ if __name__ == "__main__":
                     for m in range(nearestAtomNum):
                         index = np.where(uniqueSpecies == speciesTot[topAtomIndicies[i, j, k, m]])[0]
                         speciesCount[index] += 1
-                        speciesSpace[i, j, k, index] += min(1.0 / 0.71, 2.0 / (distance[i, j, k, topAtomIndicies[i, j, k, m]] + delta))
+                        speciesSpace[i, j, k, index] += min(0.71, 1.0 / (distance[i, j, k, topAtomIndicies[i, j, k, m]] + delta))
                     for m, count in enumerate(speciesCount):
                         if count >= 2:
                             speciesSpace[i, j, k, m] /= count
@@ -132,7 +132,10 @@ if __name__ == "__main__":
         labels = kmeans.labels_
         labels = np.array(labels).reshape(speciesSpace.shape[:3])
         print(np.mean(labels, axis=(0, 1)))
+    else:
+        labels = None
+    utils.visualize_func(labels, zoom_factor=1.0)
 
     comm.Barrier()
-    if rank == 0:
-        shutil.rmtree(storeFolder)
+    # if rank == 0:
+    #     shutil.rmtree(storeFolder)
