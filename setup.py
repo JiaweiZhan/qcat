@@ -23,7 +23,8 @@ setup(
         "numpy",
         "scipy",
         "tqdm",
-        "scikit-learn"
+        "scikit-learn",
+        "PyYAML"
         ],
     include_package_data=True,
 )

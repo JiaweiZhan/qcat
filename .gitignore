@@ -14,3 +14,4 @@ example/sub_qb
 example/rcc-*
 example/*.vasp
 example/.ipynb_checkpoints/*
+**/Dataset/
