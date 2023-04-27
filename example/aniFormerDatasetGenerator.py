@@ -45,7 +45,7 @@ def test_dataset():
             'atomic_positions': [[5, 0, 0], [0, 5, 0], [0, 0, 5]],
             'species': [1, 6, 8],
             'species_order': ['H', 'C', 'O'],
-            'target_point' : [0.0, 0.0, 0.0]
+            'target_point' : [[0.0, 0.0, 0.0]]
             }
     structure_fname = f'test.pkl'
     with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
