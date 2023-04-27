@@ -9,7 +9,7 @@ import pickle
 from tqdm import tqdm
 import numpy as np
 import shutil, os, yaml
-import pickle, h5py
+import pickle, h5py, sys
 
 comm = MPI.COMM_WORLD
 bohr2angstrom = 0.529177249
@@ -23,6 +23,36 @@ PERIODIC_TABLE = """
     Cs  Ba  La  Ce  Pr  Nd  Pm  Sm  Eu  Gd  Tb  Dy  Ho  Er  Tm  Yb  Lu  Hf  Ta  W   Re  Os  Ir  Pt  Au  Hg  Tl  Pb  Bi  Po  At  Rn
     Fr  Ra  Ac  Th  Pa  U   Np  Pu  Am  Cm  Bk  Cf  Es  Fm  Md  No  Lr  Rf  Db  Sg  Bh  Hs  Mt  Ds  Rg  Cn  Nh  Fl  Mc  Lv  Ts  Og
     """.strip().split()
+
+def test_dataset():
+    print("Runing TestSet")
+    dataset_folder = './Dataset_test'
+    structure_folder = 'structures'
+    attribute_folder = 'attributes'
+    material_name = 'test'
+    if not os.path.exists(dataset_folder):
+        os.mkdir(dataset_folder)
+    if not os.path.exists(os.path.join(dataset_folder, structure_folder)):
+        os.mkdir(os.path.join(dataset_folder, structure_folder))
+    if not os.path.exists(os.path.join(dataset_folder, attribute_folder)):
+        os.mkdir(os.path.join(dataset_folder, attribute_folder))
+    if not os.path.exists(os.path.join(dataset_folder, attribute_folder, material_name)):
+        os.mkdir(os.path.join(dataset_folder, attribute_folder, material_name))
+
+    structure_data = {
+            'cell': [[10, 0, 0], [0, 10, 0], [0, 0, 10]],
+            'pbc': [True, True, True],
+            'atomic_positions': [[5, 0, 0], [0, 5, 0], [0, 0, 5]],
+            'species': [1, 6, 8],
+            'species_order': ['H', 'C', 'O'],
+            'target_point' : [0.0, 0.0, 0.0]
+            }
+    structure_fname = f'test.pkl'
+    with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
+        pickle.dump(structure_data, pickle_file)
+    attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{1}")
+    np.save(attribute_fname, np.array(10))
+
 
 if __name__ == "__main__":
     # signal.signal(signal.SIGINT, partial(utils.handler, comm))
@@ -41,7 +71,15 @@ if __name__ == "__main__":
             help="material_name. Default: sihwat")
     parser.add_argument("-o", "--species_order", nargs='*',
             help="species_order. Default: H O Si")
+    parser.add_argument("-t", "--test", default=False, action='store_true',
+            help="whether to run testset. Default: False")
     args = parser.parse_args()
+
+    if args.test:
+        if rank == 0:
+            test_dataset()
+        comm.Barrier()
+        sys.exit(0)
 
     if not args.saveFileFolder:
         args.saveFileFolder = "../" 
