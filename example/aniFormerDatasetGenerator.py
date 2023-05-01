@@ -24,6 +24,9 @@ PERIODIC_TABLE = """
     Fr  Ra  Ac  Th  Pa  U   Np  Pu  Am  Cm  Bk  Cf  Es  Fm  Md  No  Lr  Rf  Db  Sg  Bh  Hs  Mt  Ds  Rg  Cn  Nh  Fl  Mc  Lv  Ts  Og
     """.strip().split()
 
+def visualize_alpha(alpha, fileName = 'alpha_zoom.dat'):
+    utils.visualize_func(alpha, zoom_factor=0.5, fileName=fileName)
+
 def test_dataset():
     print("Runing TestSet")
     dataset_folder = './Dataset_test'
@@ -40,17 +43,28 @@ def test_dataset():
         os.mkdir(os.path.join(dataset_folder, attribute_folder, material_name))
 
     structure_data = {
-            'cell': [[10, 0, 0], [0, 10, 0], [0, 0, 10]],
+            'cell': [[6, 0, 0], [0, 6, 0], [0, 0, 6]],
             'pbc': [True, True, True],
-            'atomic_positions': [[5, 0, 0], [0, 5, 0], [0, 0, 5]],
+            'atomic_positions': [[3, 0, 0], [0, 3, 0], [0, 0, 3]],
             'species': [1, 6, 8],
             'species_order': ['H', 'C', 'O'],
-            'target_point' : [[0.0, 0.0, 0.0]]
+            'target_point' : [
+                [0.0, 0.0, 0.0],
+                [0.0, 0.8, 0.0],
+                [0.8, 0.0, 0.0],
+                [0.8, 0.8, 0.0],
+                ]
             }
     structure_fname = f'test.pkl'
     with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
         pickle.dump(structure_data, pickle_file)
     attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{1}")
+    np.save(attribute_fname, np.array(5))
+    attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{2}")
+    np.save(attribute_fname, np.array(5))
+    attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{3}")
+    np.save(attribute_fname, np.array(10))
+    attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{4}")
     np.save(attribute_fname, np.array(10))
 
 
@@ -73,6 +87,8 @@ if __name__ == "__main__":
             help="species_order. Default: H O Si")
     parser.add_argument("-t", "--test", default=False, action='store_true',
             help="whether to run testset. Default: False")
+    parser.add_argument("-v", "--visualize_alpha", default=False, action='store_true',
+            help="whether to visualize alpha. Default: False")
     args = parser.parse_args()
 
     if args.test:
@@ -132,6 +148,11 @@ if __name__ == "__main__":
 
     alphaFile = args.alphaFile 
     alpha = utils.read_alpha(alphaFile=alphaFile, npv=npv)
+
+    if args.visualize_alpha:
+        visualize_alpha(alpha)
+        comm.Barrier()
+        sys.exit(0)
 
     dataset_folder = './Dataset'
     structure_folder = 'structures'
