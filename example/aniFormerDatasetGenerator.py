@@ -67,6 +67,18 @@ def test_dataset():
     attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{4}")
     np.save(attribute_fname, np.array(10))
 
+def outputStructure(structure_data, threeDGrid, point_gap, dataset_folder, structure_folder, material_name):
+    divisions = np.array([1 / threeDGrid[0], 1 / threeDGrid[1], 1 / threeDGrid[2]], dtype=float)
+    i, j, k = np.mgrid[0:threeDGrid[0]:point_gap, 0:threeDGrid[1]:point_gap, 0:threeDGrid[2]:point_gap]
+    point_indices = np.array([i, j, k]).T.reshape(-1, 3)
+    target_point = point_indices * divisions[None, :]
+    structure_data['target_point'] = target_point.tolist()
+
+    structure_fname = f'{material_name}.pkl'
+    with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
+        pickle.dump(structure_data, pickle_file)
+    point_indices = point_indices.tolist()
+    return point_indices
 
 if __name__ == "__main__":
     # signal.signal(signal.SIGINT, partial(utils.handler, comm))
@@ -91,6 +103,8 @@ if __name__ == "__main__":
             help="whether to visualize alpha. Default: False")
     parser.add_argument("-e", "--eval_data", default=False, action='store_true',
             help="whether to output structure for evaluation of aniformer. Default: False")
+    parser.add_argument("-oa", "--outputAttribute", type=str, 
+            help="output 'rho' or 'epsilon'. Default: 'epsilon'")
     args = parser.parse_args()
 
     if args.test:
@@ -107,12 +121,18 @@ if __name__ == "__main__":
         args.material_name = "sihwat" 
     if not args.species_order:
         args.species_order =  ['H', 'O', 'Si']
+    if not args.outputAttribute:
+        args.outputAttribute = "epsilon"
+    args.outputAttribute = args.outputAttribute.strip().lower()
+    if args.outputAttribute != "rho" and args.outputAttribute != "epsilon":
+        raise KeyError("outputAttribute can only be epsilon or rho")
     material_name = args.material_name
 
     conf_tab = {"saveFileFolder": args.saveFileFolder,
                 "alphaFile": args.alphaFile,
                 "material_name": args.material_name,
                 "species_order": args.species_order,
+                "species_order": args.outputAttribute,
                 "testset": args.test,
                 "visualize": args.visualize_alpha,
                 "eval_data": args.eval_data,
@@ -141,8 +161,13 @@ if __name__ == "__main__":
         info_data = pickle.load(handle)
 
     npv = info_data['npv']
+    fftw = info_data['fftw']
     cell = info_data['cell'] * bohr2angstrom
     species_loc = info_data['atompos']
+    nbnd = info_data['nbnd']
+    nspin = info_data['nspin']
+    occ = info_data['occ']
+    fileNameList = info_data['wfc_file']
 
     name2index = {s: k for k, s, in enumerate(PERIODIC_TABLE, 1)}
     species, positions = [], []
@@ -151,8 +176,37 @@ if __name__ == "__main__":
         positions.append(i[1:])
     positions = (np.array(positions) * bohr2angstrom).tolist()
 
-    alphaFile = args.alphaFile 
-    alpha = utils.read_alpha(alphaFile=alphaFile, npv=npv)
+    alpha = None
+    threeDGrid = npv
+    point_gap = 5
+    if "epsilon" in args.outputAttribute:
+        alphaFile = args.alphaFile 
+        alpha = utils.read_alpha(alphaFile=alphaFile, npv=npv)
+    else:
+        point_gap = 2
+        threeDGrid = fftw
+        rho_total = np.zeros(threeDGrid)
+        for ispin in range(nspin):
+            if rank == 0:
+                pbar = tqdm(desc=f'store read wfc for spin {ispin + 1}: ', total=nbnd[ispin])
+            comm.Barrier()
+            for ibnd_i in range(nbnd[ispin]): 
+                if ibnd_i % size == rank:
+                    fileName = fileNameList[ispin][0, ibnd_i]
+                    wfc_i = np.load(fileName)
+                    rho_total += np.absolute(wfc_i) ** 2 * occ[ispin][0, ibnd_i]
+                    if rank == 0:
+                        value = size
+                        if nbnd[ispin] - ibnd_i < value:
+                            value = nbnd[ispin] - ibnd_i
+                        pbar.update(value)
+            comm.Barrier()
+            if rank == 0:
+                pbar.close()
+        alpha = np.zeros_like(rho_total)
+        comm.Allreduce(rho_total, recvbuf=alpha, op=MPI.SUM)
+        if rank == 0:
+            print(np.sum(alpha))
 
     if args.visualize_alpha:
         visualize_alpha(alpha)
@@ -195,17 +249,7 @@ if __name__ == "__main__":
                 pickle.dump(structure_data, pickle_file)
             sys.exit(0)
 
-        point_gap = 5
-        divisions = np.array([1 / npv[0], 1 / npv[1], 1 / npv[2]], dtype=float)
-        i, j, k = np.mgrid[0:npv[0]:point_gap, 0:npv[1]:point_gap, 0:npv[2]:point_gap]
-        point_indices = np.array([i, j, k]).T.reshape(-1, 3)
-        target_point = point_indices * divisions[None, :]
-        structure_data['target_point'] = target_point.tolist()
-
-        structure_fname = f'{material_name}.pkl'
-        with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
-            pickle.dump(structure_data, pickle_file)
-        point_indices = point_indices.tolist()
+        point_indices = outputStructure(structure_data, threeDGrid, point_gap, dataset_folder, structure_folder, material_name)
     else:
         if args.eval_data:
             sys.exit(0)
