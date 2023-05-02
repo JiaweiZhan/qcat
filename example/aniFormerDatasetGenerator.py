@@ -89,6 +89,8 @@ if __name__ == "__main__":
             help="whether to run testset. Default: False")
     parser.add_argument("-v", "--visualize_alpha", default=False, action='store_true',
             help="whether to visualize alpha. Default: False")
+    parser.add_argument("-e", "--eval_data", default=False, action='store_true',
+            help="whether to output structure for evaluation of aniformer. Default: False")
     args = parser.parse_args()
 
     if args.test:
@@ -111,6 +113,9 @@ if __name__ == "__main__":
                 "alphaFile": args.alphaFile,
                 "material_name": args.material_name,
                 "species_order": args.species_order,
+                "testset": args.test,
+                "visualize": args.visualize_alpha,
+                "eval_data": args.eval_data,
                 "MPI size": comm.Get_size()}
     utils.print_conf(conf_tab)
 
@@ -178,6 +183,18 @@ if __name__ == "__main__":
                 'species_order': args.species_order,
                 }
 
+        if args.eval_data:
+            # output only the structure_data without target_point
+            eval_dataset_folder = './Dataset_eval'
+            if not os.path.exists(eval_dataset_folder):
+                os.mkdir(eval_dataset_folder)
+            if not os.path.exists(os.path.join(eval_dataset_folder, structure_folder)):
+                os.mkdir(os.path.join(eval_dataset_folder, structure_folder))
+            structure_fname = f'{material_name}.pkl'
+            with open(os.path.join(eval_dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
+                pickle.dump(structure_data, pickle_file)
+            sys.exit(0)
+
         point_gap = 5
         divisions = np.array([1 / npv[0], 1 / npv[1], 1 / npv[2]], dtype=float)
         i, j, k = np.mgrid[0:npv[0]:point_gap, 0:npv[1]:point_gap, 0:npv[2]:point_gap]
@@ -185,11 +202,13 @@ if __name__ == "__main__":
         target_point = point_indices * divisions[None, :]
         structure_data['target_point'] = target_point.tolist()
 
-        structure_fname = f'sihwat.pkl'
+        structure_fname = f'{material_name}.pkl'
         with open(os.path.join(dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
             pickle.dump(structure_data, pickle_file)
         point_indices = point_indices.tolist()
     else:
+        if args.eval_data:
+            sys.exit(0)
         point_indices = None
     point_indices = comm.bcast(point_indices, root=0)
     point_indices = np.array(point_indices)

@@ -16,3 +16,4 @@ example/*.vasp
 example/.ipynb_checkpoints/*
 **/Dataset/**
 **/Dataset_test/**
+**/Dataset_eval/**
