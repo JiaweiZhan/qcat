@@ -25,7 +25,7 @@ PERIODIC_TABLE = """
     """.strip().split()
 
 def visualize_alpha(alpha, fileName = 'alpha_zoom.dat'):
-    utils.visualize_func(alpha, zoom_factor=0.5, fileName=fileName)
+    utils.visualize_func(alpha, zoom_factor=1.0, fileName=fileName)
 
 def test_dataset():
     print("Runing TestSet")
@@ -163,6 +163,7 @@ if __name__ == "__main__":
     npv = info_data['npv']
     fftw = info_data['fftw']
     cell = info_data['cell'] * bohr2angstrom
+    volume = np.abs(np.dot(np.cross(cell[0], cell[1]), cell[2]))
     species_loc = info_data['atompos']
     nbnd = info_data['nbnd']
     nspin = info_data['nspin']
@@ -205,9 +206,7 @@ if __name__ == "__main__":
                 pbar.close()
         alpha = np.zeros_like(rho_total)
         comm.Allreduce(rho_total, recvbuf=alpha, op=MPI.SUM)
-        if rank == 0:
-            print(np.sum(alpha))
-
+        alpha /= volume
     if args.visualize_alpha:
         visualize_alpha(alpha)
         comm.Barrier()
@@ -267,7 +266,9 @@ if __name__ == "__main__":
     for index in range(attributes.shape[0]):
         if index % size == rank:
             attribute_fname = os.path.join(dataset_folder, attribute_folder, material_name, f"{material_name}__{index + 1}")
-            np.save(attribute_fname, attributes[index])
+            file = open(attribute_fname+'.npy', 'wb')
+            np.save(file, attributes[index])
+            file.close()
 
             if rank == 0:
                 value = size
