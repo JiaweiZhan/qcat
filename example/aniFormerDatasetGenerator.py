@@ -132,7 +132,7 @@ if __name__ == "__main__":
                 "alphaFile": args.alphaFile,
                 "material_name": args.material_name,
                 "species_order": args.species_order,
-                "species_order": args.outputAttribute,
+                "output_attribute": args.outputAttribute,
                 "testset": args.test,
                 "visualize": args.visualize_alpha,
                 "eval_data": args.eval_data,
