@@ -19,3 +19,4 @@ example/.ipynb_checkpoints/*
 **/Dataset_eval/**
 **/Dataset_epsilon/**
 **/Dataset_rho/**
+**/*.npy

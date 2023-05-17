@@ -180,33 +180,14 @@ if __name__ == "__main__":
     alpha = None
     threeDGrid = npv
     point_gap = 5
-    if "epsilon" in args.outputAttribute:
+    if args.outputAttribute == 'epsilon':
         alphaFile = args.alphaFile 
         alpha = utils.read_alpha(alphaFile=alphaFile, npv=npv)
     else:
-        point_gap = 2
-        threeDGrid = fftw
-        rho_total = np.zeros(threeDGrid)
-        for ispin in range(nspin):
-            if rank == 0:
-                pbar = tqdm(desc=f'store read wfc for spin {ispin + 1}: ', total=nbnd[ispin])
-            comm.Barrier()
-            for ibnd_i in range(nbnd[ispin]): 
-                if ibnd_i % size == rank:
-                    fileName = fileNameList[ispin][0, ibnd_i]
-                    wfc_i = np.load(fileName)
-                    rho_total += np.absolute(wfc_i) ** 2 * occ[ispin][0, ibnd_i]
-                    if rank == 0:
-                        value = size
-                        if nbnd[ispin] - ibnd_i < value:
-                            value = nbnd[ispin] - ibnd_i
-                        pbar.update(value)
-            comm.Barrier()
-            if rank == 0:
-                pbar.close()
-        alpha = np.zeros_like(rho_total)
-        comm.Allreduce(rho_total, recvbuf=alpha, op=MPI.SUM)
-        alpha /= volume
+        point_gap = 5
+        alphaFile = args.alphaFile 
+        alpha = np.load(alphaFile)
+        threeDGrid = alpha.shape
     if args.visualize_alpha:
         visualize_alpha(alpha)
         comm.Barrier()
