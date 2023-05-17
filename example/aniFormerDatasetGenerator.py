@@ -177,6 +177,31 @@ if __name__ == "__main__":
         positions.append(i[1:])
     positions = (np.array(positions) * bohr2angstrom).tolist()
 
+    if args.eval_data:
+        if rank == 0:
+            structure_data = {
+                    'cell': cell.tolist(),
+                    'pbc': [True, True, True],
+                    'atomic_positions': positions,
+                    'species': species,
+                    'species_order': args.species_order,
+                    }
+
+            # output only the structure_data without target_point
+            eval_dataset_folder = './Dataset_eval'
+            structure_folder = 'structures'
+            attribute_folder = 'attributes'
+            if not os.path.exists(eval_dataset_folder):
+                os.mkdir(eval_dataset_folder)
+            if not os.path.exists(os.path.join(eval_dataset_folder, structure_folder)):
+                os.mkdir(os.path.join(eval_dataset_folder, structure_folder))
+            structure_fname = f'{material_name}.pkl'
+            with open(os.path.join(eval_dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
+                pickle.dump(structure_data, pickle_file)
+            sys.exit(0)
+        else:
+            sys.exit(0)
+
     alpha = None
     threeDGrid = npv
     point_gap = 5
@@ -216,24 +241,10 @@ if __name__ == "__main__":
                 'species': species,
                 'species_order': args.species_order,
                 }
-
-        if args.eval_data:
-            # output only the structure_data without target_point
-            eval_dataset_folder = './Dataset_eval'
-            if not os.path.exists(eval_dataset_folder):
-                os.mkdir(eval_dataset_folder)
-            if not os.path.exists(os.path.join(eval_dataset_folder, structure_folder)):
-                os.mkdir(os.path.join(eval_dataset_folder, structure_folder))
-            structure_fname = f'{material_name}.pkl'
-            with open(os.path.join(eval_dataset_folder, structure_folder, structure_fname), 'wb') as pickle_file:
-                pickle.dump(structure_data, pickle_file)
-            sys.exit(0)
-
         point_indices = outputStructure(structure_data, threeDGrid, point_gap, dataset_folder, structure_folder, material_name)
     else:
-        if args.eval_data:
-            sys.exit(0)
         point_indices = None
+
     point_indices = comm.bcast(point_indices, root=0)
     point_indices = np.array(point_indices)
 
