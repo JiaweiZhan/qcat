@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 import os, time, pathlib
 import threading
-from . import qe_io
+from abinitioToolKit import qe_io
 import shutil
 from mpi4py import MPI
 import pickle
@@ -30,7 +30,7 @@ class LDOS:
 
         self.storeFolder = storeFolder 
         rank, size = 0, 1
-        if not self.comm is None:
+        if self.comm:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
         self.read_obj.read(saveFileFolder=self.saveFolder, storeFolder=self.storeFolder)
@@ -52,8 +52,12 @@ class LDOS:
                 isExist = os.path.exists(self.storeFolder)
                 if isExist:
                     shutil.rmtree(self.storeFolder)
-                self.comm.Abort()
-        self.comm.Barrier()
+                if self.comm:
+                    self.comm.Abort()
+                else:
+                    assert False
+        if self.comm:
+            self.comm.Barrier()
 
         ksStateZAve_loc = np.zeros((nspin, nks, nbnd, fft_grid[2]), dtype=np.double)
 
@@ -68,11 +72,11 @@ class LDOS:
                 evc_r = np.load(wfcName)
                 ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
 
-        # self.comm.Barrier()
-        # if rank == 0:
-        #     shutil.rmtree(storeFolder)
         ksStateZAve = np.zeros_like(ksStateZAve_loc)
-        self.comm.Allreduce(ksStateZAve_loc, ksStateZAve)
+        if self.comm:
+            self.comm.Allreduce(ksStateZAve_loc, ksStateZAve)
+        else:
+            ksStateZAve = ksStateZAve_loc
 
         lcbm_loc = np.zeros(fft_grid[2])
         lvbm_loc = np.zeros(fft_grid[2])
@@ -120,8 +124,12 @@ class LDOS:
         self.lcbm = np.zeros_like(lcbm_loc)
         self.lvbm = np.zeros_like(lvbm_loc)
 
-        self.comm.Allreduce(lcbm_loc, self.lcbm)
-        self.comm.Allreduce(lvbm_loc, self.lvbm)
+        if self.comm:
+            self.comm.Allreduce(lcbm_loc, self.lcbm)
+            self.comm.Allreduce(lvbm_loc, self.lvbm)
+        else:
+            self.lcbm = lcbm_loc
+            self.lvbm = lvbm_loc
 
     def localBandEdge(self):
         return self.lcbm, self.lvbm

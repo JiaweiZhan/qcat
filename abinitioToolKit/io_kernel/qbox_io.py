@@ -9,8 +9,8 @@ from mpi4py import MPI
 from tqdm import tqdm
 import shutil
 
-from . import utils
-from .io import Read
+from abinitioToolKit import utils
+from abinitioToolKit.io_kernel.base_io import Read
 
 class QBOXRead(Read):
 
@@ -69,7 +69,10 @@ class QBOXRead(Read):
         if not self.comm is None:
             self.comm.Barrier()
 
-        context = etree.iterparse(self.xmlSample, huge_tree=True, events=('start', 'end'))
+        if file_name is None:
+            file_name = self.xmlSample
+
+        context = etree.iterparse(file_name, huge_tree=True, events=('start', 'end'))
 
         nks = 1
         weights = np.ones(nks)
@@ -131,7 +134,7 @@ class QBOXRead(Read):
                     occ[key] = occ[key][np.newaxis, :]
             element.clear()
         species_loc = []
-        context = etree.iterparse(self.xmlSample, tag="atom")
+        context = etree.iterparse(file_name, tag="atom")
         for _, element in context:
             species = element.get("species")
             for subele in list(element):
@@ -139,7 +142,7 @@ class QBOXRead(Read):
                     position = [float(num) for num in subele.text.split()]
                     species_loc.append([species] + position)
 
-        context = etree.iterparse(self.xmlSample, huge_tree=True)
+        context = etree.iterparse(file_name, huge_tree=True)
 
         index_mp = 0
 
@@ -233,7 +236,8 @@ class QBOXRead(Read):
         if rank == 0:
             with open(storeFolder + '/info.pickle', 'wb') as handle:
                 pickle.dump(self.wfc_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        self.comm.Barrier()
+        if not self.comm is None:
+            self.comm.Barrier()
         return wfc_dict
 
     def read(self, saveFileFolder, storeFolder, ):

@@ -4,8 +4,8 @@ this file contains the class for compute LF that can be used in LRS-DDH
 import numpy as np
 import argparse
 import os, time
-from . import qbox_io
-from . import utils
+from abinitioToolKit import qbox_io
+from abinitioToolKit import utils
 import shutil
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import zoom
@@ -38,7 +38,7 @@ class LF:
 
         rank = 0
         size = 1
-        if not comm is None:
+        if comm:
             rank = comm.Get_rank()
             size = comm.Get_size()
 
@@ -70,7 +70,7 @@ class LF:
             if not isExist:
                 # Create a new directory because it does not exist
                 os.makedirs(lfFolder)
-        if not comm is None:
+        if comm:
             comm.Barrier()
         for ispin in range(nspin):
             # TODO: Possible multithread here
@@ -109,7 +109,7 @@ class LF:
                         lfFile.write(bytes(lf[:, :, k].flatten()))
                     lfFile.close()
 
-        if not comm is None:
+        if comm:
             comm.Barrier()
         if rank == 0:
             shutil.rmtree(storeFolder)

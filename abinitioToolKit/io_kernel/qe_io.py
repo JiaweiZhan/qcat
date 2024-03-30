@@ -8,13 +8,14 @@ from mpi4py import MPI
 import time
 import pathlib
 import shutil
-from .io import Read
+from .base_io import Read
 
 class QERead(Read):
 
     def __init__(self, comm=None):
         self.xml_data = None
         self.comm = comm
+        self.qe_outputFolder = None
 
     def parse_info(self, saveFolder, store=True, storeFolder='./wfc/'):
         """
@@ -24,8 +25,9 @@ class QERead(Read):
             return:
                  dict of {'nks', 'kweights', 'nbnd', 'eigen', 'occ', 'fftw'}
         """
+        self.qe_outputFolder = saveFolder
         rank = 0
-        if not self.comm is None:
+        if self.comm:
             rank = self.comm.Get_rank()
         if rank == 0:
             if store:
@@ -33,7 +35,7 @@ class QERead(Read):
                 if not isExist:
                     # Create a new directory because it does not exist
                     os.makedirs(storeFolder)
-        if not self.comm is None:
+        if self.comm:
             self.comm.Barrier()
         # unit convert
         hartree2ev = 27.2114
@@ -143,7 +145,10 @@ class QERead(Read):
         self.xml_data = out_dict
         return out_dict 
 
-    def parse_wfc(self, saveFolder, storeFolder='./wfc/'):
+    def parse_wfc(self,
+                  saveFolder=None,
+                  real_space=False,
+                  storeFolder='./wfc/'):
         """
         analyze QE wfc*.dat 
             param:
@@ -152,7 +157,7 @@ class QERead(Read):
                  dict of {'ik', 'xk', 'ispin', 'nbnd', 'ngw', 'evc'...}
         """
         rank, size = 0, 1
-        if not self.comm is None:
+        if self.comm:
             size = self.comm.Get_size()
             rank = self.comm.Get_rank()
         if rank == 0:
@@ -160,9 +165,12 @@ class QERead(Read):
             if not isExist:
                 # Create a new directory because it does not exist
                 os.makedirs(storeFolder)
-        if not self.comm is None:
+        if self.comm:
             self.comm.Barrier()
 
+        if saveFolder is None:
+            assert self.qe_outputFolder is not None
+            saveFolder = self.qe_outputFolder
         wfc_files = [saveFolder + '/' + file for file in os.listdir(saveFolder) if 'wfc' in file]
         for file_name in wfc_files:
             hdf5 = (".hdf5" == pathlib.Path(file_name).suffix)
@@ -198,7 +206,10 @@ class QERead(Read):
                     f.seek(8,1)
                     
                     mill = np.fromfile(f, dtype='int32', count=3*igwx)
-                    mill = mill.reshape( (igwx, 3) ) 
+                    mill = mill.reshape( (igwx, 3) )
+                    if rank == 0:
+                        fileName = os.path.join(storeFolder, 'mill')
+                        np.save(fileName, mill)
 
                     wfc_dict = {'ik': ik,
                                 'xk': xk,
@@ -228,21 +239,28 @@ class QERead(Read):
                 count = [len(a) * npol * igwx for a in ibnd_loc]
                 displ = np.array([sum(count[:p]) for p in range(size)])
 
-                recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
-                self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+                if self.comm:
+                    recvbuf = np.empty((len(ibnd_loc[rank]), npol*igwx), dtype='complex128')
+                    self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+                else:
+                    recvbuf = evc
 
                 fft_grid = self.xml_data['fftw']
                 if rank == 0:
                     pbar = tqdm(desc=f"store wfc of spin:{ispin:^3}/{self.xml_data['nspin']:^3}; ik:{ik:^3}/{self.xml_data['nks']:^3}", total=nbnd)
                 for index, i in enumerate(ibnd_loc[rank]):
-                    evc_g = np.zeros(fft_grid, dtype=np.complex128)
-                    evc_g[mill[:, 0], mill[:, 1], mill[:, 2]] = recvbuf[index, :] 
-                    if gamma_only:
-                        assert(np.all(mill[0, :] == 0))
-                        evc_g[-mill[1:, 0], -mill[1:, 1], -mill[1:, 2]] = np.conj(recvbuf[index, 1:]) 
-                    evc_r = np.fft.ifftn(evc_g, norm='forward')
-                    fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
-                    np.save(fileName, evc_r)
+                    if real_space:
+                        evc_g = np.zeros(fft_grid, dtype=np.complex128)
+                        evc_g[mill[:, 0], mill[:, 1], mill[:, 2]] = recvbuf[index, :] 
+                        if gamma_only:
+                            assert(np.all(mill[0, :] == 0))
+                            evc_g[-mill[1:, 0], -mill[1:, 1], -mill[1:, 2]] = np.conj(recvbuf[index, 1:]) 
+                        data2store = np.fft.ifftn(evc_g, norm='forward')
+                        fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
+                    else:
+                        data2store = recvbuf[index, :]
+                        fileName = storeFolder + '/wfc_' + str(ispin) + '_' + str(ik).zfill(3) + '_' + str(i + 1).zfill(5) + '_g'
+                    np.save(fileName, data2store)
                     if rank == 0:
                         value = np.sum([len(loc) > index for loc in ibnd_loc]) 
                         pbar.update(value)
@@ -274,27 +292,41 @@ class QERead(Read):
                 else:
                     wfc_dict = None
                     send_data = None
-                wfc_dict = self.comm.bcast(wfc_dict, root=0)
+                
+                if self.comm:
+                    wfc_dict = self.comm.bcast(wfc_dict, root=0)
+
+                if rank == 0:
+                    fileName = os.path.join(storeFolder, 'mill')
+                    np.save(fileName, np.asarray(wfc_dict['mill']))
+
                 ibnd_global = np.arange(wfc_dict['nbnd'])
                 ibnd_loc=  np.array_split(ibnd_global, size)
                 count = [len(a) * wfc_dict['npol'] * wfc_dict['igwx'] for a in ibnd_loc]
                 displ = np.array([sum(count[:p]) for p in range(size)])
 
-                recvbuf = np.empty((len(ibnd_loc[rank]), wfc_dict['npol'] * wfc_dict['igwx']), dtype='complex128')
-                self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+                if self.comm:
+                    recvbuf = np.empty((len(ibnd_loc[rank]), wfc_dict['npol'] * wfc_dict['igwx']), dtype='complex128')
+                    self.comm.Scatterv([send_data, count, displ, MPI.COMPLEX16], recvbuf, root=0)
+                else:
+                    recvbuf = evc
 
                 fft_grid = self.xml_data['fftw']
                 if rank == 0:
                     pbar = tqdm(desc=f"store wfc of ispin:{wfc_dict['ispin']:^3}/{self.xml_data['nspin']:^3}; ik:{wfc_dict['ik']:^3}/{self.xml_data['nks']:^3}", total=wfc_dict['nbnd'])
                 for index, i in enumerate(ibnd_loc[rank]):
-                    evc_g = np.zeros(fft_grid, dtype=np.complex128)
-                    evc_g[wfc_dict['mill'][:, 0], wfc_dict['mill'][:, 1], wfc_dict['mill'][:, 2]] = recvbuf[index, :] 
-                    if wfc_dict['gamma_only']:
-                        assert(np.all(wfc_dict['mill'][0, :] == 0))
-                        evc_g[-wfc_dict['mill'][1:, 0], -wfc_dict['mill'][1:, 1], -wfc_dict['mill'][1:, 2]] = np.conj(recvbuf[index, 1:]) 
-                    evc_r = np.fft.ifftn(evc_g, norm='forward')
-                    fileName = storeFolder + '/wfc_' + str(wfc_dict['ispin']) + '_' + str(wfc_dict['ik']).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
-                    np.save(fileName, evc_r)
+                    if real_space:
+                        evc_g = np.zeros(fft_grid, dtype=np.complex128)
+                        evc_g[wfc_dict['mill'][:, 0], wfc_dict['mill'][:, 1], wfc_dict['mill'][:, 2]] = recvbuf[index, :] 
+                        if wfc_dict['gamma_only']:
+                            assert(np.all(wfc_dict['mill'][0, :] == 0))
+                            evc_g[-wfc_dict['mill'][1:, 0], -wfc_dict['mill'][1:, 1], -wfc_dict['mill'][1:, 2]] = np.conj(recvbuf[index, 1:]) 
+                        data2store = np.fft.ifftn(evc_g, norm='forward')
+                        fileName = storeFolder + '/wfc_' + str(wfc_dict['ispin']) + '_' + str(wfc_dict['ik']).zfill(3) + '_' + str(i + 1).zfill(5) + '_r'
+                    else:
+                        data2store = recvbuf[index, :]
+                        fileName = storeFolder + '/wfc_' + str(wfc_dict['ispin']) + '_' + str(wfc_dict['ik']).zfill(3) + '_' + str(i + 1).zfill(5) + '_g'
+                    np.save(fileName, data2store)
                     if rank == 0:
                         value = np.sum([len(loc) > index for loc in ibnd_loc]) 
                         pbar.update(value)
@@ -319,7 +351,8 @@ class QERead(Read):
 
             with open(storeFolder + '/info.pickle', 'wb') as handle:
                 pickle.dump(info_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        self.comm.Barrier()
+        if self.comm:
+            self.comm.Barrier()
 
     def read(self, saveFileFolder, storeFolder, ):
         self.parse_info(saveFolder=saveFileFolder, store=True, storeFolder='./wfc/')
@@ -327,7 +360,7 @@ class QERead(Read):
 
     def info(self):
         rank = 0
-        if not self.comm is None:
+        if self.comm:
             rank = self.comm.Get_rank()
         if rank == 0:
             print("----------------QE XML-------------------")
@@ -351,13 +384,13 @@ class QERead(Read):
 
     def clean_wfc(self, storeFolder='./wfc/'):
         rank = 0
-        if not self.comm is None:
+        if self.comm:
             rank = self.comm.Get_rank()
         if rank == 0:
             isExist = os.path.exists(storeFolder)
             if isExist:
                 shutil.rmtree(storeFolder)
-        if not self.comm is None:
+        if self.comm:
             self.comm.Barrier()
 
 if __name__ == "__main__":
