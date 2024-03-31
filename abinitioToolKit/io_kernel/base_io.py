@@ -2,13 +2,20 @@ from abc import abstractmethod, ABCMeta
 
 class Read(metaclass=ABCMeta):
     @abstractmethod
-    def parse_info(self, saveFileFolder=None, store=True, storeFolder='./wfc/'):
+    def parse_info(self,
+                   store: bool=True,
+                   storeFolder: str='./wfc/',
+                   ):
         pass
 
     @abstractmethod
-    def parse_wfc(self, saveFileFolder, storeFolder='./wfc/'):
+    def parse_wfc(self,
+                  storeFolder: str='./wfc/',
+                  ):
         pass
 
     @abstractmethod
-    def clean_wfc(self, storeFolder='./wfc/'):
+    def clean_wfc(self,
+                  storeFolder: str='./wfc/',
+                  ):
         pass

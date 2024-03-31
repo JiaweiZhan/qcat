@@ -12,12 +12,18 @@ from .base_io import Read
 
 class QERead(Read):
 
-    def __init__(self, comm=None):
+    def __init__(self,
+                 outFolder: str,
+                 comm=None,
+                 ):
         self.xml_data = None
         self.comm = comm
-        self.qe_outputFolder = None
+        self.qe_outputFolder = outFolder
+        assert os.path.exists(outFolder), f"qe output folder {outFolder} does not exist"
 
-    def parse_info(self, saveFolder, store=True, storeFolder='./wfc/'):
+    def parse_info(self,
+                   store: bool=True,
+                   storeFolder: str='./wfc/'):
         """
         analyze QE data-file-schema.xml
             param:
@@ -25,7 +31,7 @@ class QERead(Read):
             return:
                  dict of {'nks', 'kweights', 'nbnd', 'eigen', 'occ', 'fftw'}
         """
-        self.qe_outputFolder = saveFolder
+        saveFolder = self.qe_outputFolder
         rank = 0
         if self.comm:
             rank = self.comm.Get_rank()
@@ -62,6 +68,7 @@ class QERead(Read):
         # num of KS states
         nbnd_up, nbnd_dw, nbnd = -1, -1, -1
         nbnd_nodes = file.getElementsByTagName('nbnd')
+        nbnd = []
         try: 
             nbnd = [int(nbnd_nodes[0].firstChild.data)]
         except IndexError:
@@ -71,15 +78,19 @@ class QERead(Read):
             nbnd_up = int(nbnd_up_nodes[0].firstChild.data)
             nbnd_dw_nodes = file.getElementsByTagName('nbnd_dw')
             nbnd_dw = int(nbnd_dw_nodes[0].firstChild.data)
-            if nbnd != -1:
-                assert(nbnd == nbnd_dw and nbnd == nbnd_up)
-            else:
-                assert(nbnd_up == nbnd_dw)
-                nbnd = [nbnd_dw] * 2
+            # if nbnd != -1:
+            #     assert(nbnd == nbnd_dw and nbnd == nbnd_up)
+            # else:
+            #     assert(nbnd_up == nbnd_dw)
+            #     nbnd = [nbnd_dw] * 2
+            nbnd = [nbnd_up, nbnd_dw]
 
         # fermi energy
         fermi_nodes = file.getElementsByTagName('fermi_energy')
-        fermiEne = float(fermi_nodes[0].firstChild.data) * hartree2ev
+        try:
+            fermiEne = float(fermi_nodes[0].firstChild.data) * hartree2ev
+        except IndexError:
+            fermiEne = 0.0
 
         # atomic positions 
         species_loc = []
@@ -108,18 +119,18 @@ class QERead(Read):
             eigenvalue_ = eigens_node[0].firstChild.data
             eigenvalue_ = [float(num) * hartree2ev for num in eigenvalue_.split()]
             for ispin in range(nspin):
-                eigenvalues[ispin, index, :] = eigenvalue_[ispin * nbnd[ispin] : (ispin + 1) * nbnd[ispin]]
+                eigenvalues[ispin, index, :] = eigenvalue_[int(np.sum(nbnd[:ispin])) : int(np.sum(nbnd[:ispin + 1]))]
 
             # occupation
-            # occ_nodes = ks_node.getElementsByTagName('occupations')
-            # occupation_ = occ_nodes[0].firstChild.data
-            # occupation_ = [float(num) for num in occupation_.split()]
-            # for ispin in range(nspin):
-            #     occupations[ispin, index, :] = occupation_[ispin * nbnd : (ispin + 1) * nbnd]
+            occ_nodes = ks_node.getElementsByTagName('occupations')
+            occupation_ = occ_nodes[0].firstChild.data
+            occupation_ = [float(num) for num in occupation_.split()]
+            for ispin in range(nspin):
+                occupations[ispin, index, :] = occupation_[int(np.sum(nbnd[:ispin])) : int(np.sum(nbnd[:ispin + 1]))]
 
             # occupation another way
-            occupations[eigenvalues <= fermiEne] = 1
-            occupations[eigenvalues > fermiEne] = 0
+            # occupations[eigenvalues <= fermiEne] = 1
+            # occupations[eigenvalues > fermiEne] = 0
 
         # fft grids
         fft_nodes = file.getElementsByTagName('fft_grid')
@@ -146,7 +157,6 @@ class QERead(Read):
         return out_dict 
 
     def parse_wfc(self,
-                  saveFolder=None,
                   real_space=False,
                   storeFolder='./wfc/'):
         """
@@ -168,9 +178,7 @@ class QERead(Read):
         if self.comm:
             self.comm.Barrier()
 
-        if saveFolder is None:
-            assert self.qe_outputFolder is not None
-            saveFolder = self.qe_outputFolder
+        saveFolder = self.qe_outputFolder
         wfc_files = [saveFolder + '/' + file for file in os.listdir(saveFolder) if 'wfc' in file]
         for file_name in wfc_files:
             hdf5 = (".hdf5" == pathlib.Path(file_name).suffix)
@@ -354,9 +362,15 @@ class QERead(Read):
         if self.comm:
             self.comm.Barrier()
 
-    def read(self, saveFileFolder, storeFolder, ):
-        self.parse_info(saveFolder=saveFileFolder, store=True, storeFolder='./wfc/')
-        self.parse_wfc(saveFolder=saveFileFolder, storeFolder=storeFolder)
+    def read(self,
+             storeFolder: str,
+             real_space: bool=True,
+             store_wfc: bool=True,
+             ):
+        self.parse_info(store=True,
+                        storeFolder=storeFolder)
+        self.parse_wfc(storeFolder=storeFolder,
+                       real_space=real_space)
 
     def info(self):
         rank = 0
@@ -397,8 +411,8 @@ if __name__ == "__main__":
     # test
     st = time.time()
     comm = MPI.COMM_WORLD
-    qe = QERead(comm)
-    qe.parse_info("/project/gagalli/jiaweiz/test/TEST_WEST/tutorials/h-bn/vacuum_extrapolate/vacuum_20/hbn.save/")
+    qe = QERead(comm=comm, outFolder="/project/gagalli/jiaweiz/test/TEST_WEST/tutorials/h-bn/vacuum_extrapolate/vacuum_20/hbn.save/")
+    qe.parse_info()
     # qe.parse_wfc("../8bvo_6feooh_nspin2_hdf5.save")
     qe.info()
     rank = comm.Get_rank()

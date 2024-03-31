@@ -8,36 +8,41 @@ import pickle
 from mpi4py import MPI
 from tqdm import tqdm
 import shutil
+import os
 
 from abinitioToolKit import utils
 from abinitioToolKit.io_kernel.base_io import Read
 
 class QBOXRead(Read):
 
-    def __init__(self, comm=None):
+    def __init__(self,
+                 outFolder: str,
+                 comm=None,
+                 ):
         self.wfc_data = None
         self.comm = comm
         self.qboxOut = None
         self.xmlSample = None
         self.eigens = []
 
-    def parse_info(self, saveFileFolder, store=True, storeFolder='./wfc/'):
+        files = os.listdir(outFolder)
+        files = [f for f in files if os.path.isfile(outFolder+'/'+f)]
+        for file_ in files:
+            fin = open(os.path.join(outFolder, file_), "r")
+            fin.readline()
+            line = fin.readline()
+            if "fpmd:sample" in line:
+                self.xmlSample = os.path.join(outFolder, file_)
+            elif "fpmd:simulation" in line:
+                self.qboxOut = os.path.join(outFolder, file_)
+            fin.close()
+        assert (self.qboxOut is not None and self.xmlSample is not None)
+
+    def parse_info(self):
         """
         determine which file is qbox.out, which file is XML
         by looking at the second line of file
         """
-        files = os.listdir(saveFileFolder)
-        files = [f for f in files if os.path.isfile(saveFileFolder+'/'+f)]
-        for file_ in files:
-            fin = open(saveFileFolder + '/' + file_, "r")
-            fin.readline()
-            line = fin.readline()
-            if "fpmd:sample" in line:
-                self.xmlSample = saveFileFolder + '/' + file_
-            elif "fpmd:simulation" in line:
-                self.qboxOut = saveFileFolder + '/' + file_
-            fin.close()
-        assert (self.qboxOut is not None and self.xmlSample is not None)
         context = etree.iterparse(self.qboxOut, huge_tree=True, tag="eigenset")
         for _, element in context:
             eigen_context = element.getchildren() 
@@ -46,14 +51,16 @@ class QBOXRead(Read):
                 if len(self.eigens) <= ispin:
                     self.eigens.append(list(np.fromstring(subele.text, sep=' ')))
                 else:
-                    self.eigens[ispin] = list(np.fromstring(subele.text, sep=' ')) 
+                    self.eigens[ispin] = list(np.fromstring(subele.text, sep=' '))
 
 
-    def parse_wfc(self, file_name=None, storeFolder='./wfc/'):
+    def parse_wfc(self,
+                  storeFolder: str='./wfc/',
+                  store_wfc: bool = True):
         """
         analyze qbox sample xml files 
             param:
-                file_name: str
+                storeFolder: str
             return:
                 dict of {'nbnd', 'fftw', 'nspin', 'evc'}
         """
@@ -69,8 +76,7 @@ class QBOXRead(Read):
         if not self.comm is None:
             self.comm.Barrier()
 
-        if file_name is None:
-            file_name = self.xmlSample
+        file_name = self.xmlSample
 
         context = etree.iterparse(file_name, huge_tree=True, events=('start', 'end'))
 
@@ -147,51 +153,52 @@ class QBOXRead(Read):
         index_mp = 0
 
         fileNameList_tot = {}
-        for isp in range(nspin):
-            fileNameList_sp = [] 
-            for ik in range(nks):
-                fileNameList_ik = [] 
-                for iwf in range(nbnd[isp]):
-                    fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(ik + 1).zfill(3) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
-                    fileNameList_ik.append(fileName)
-                fileNameList_sp.append(fileNameList_ik)
-            fileNameList_tot[isp] = np.array(fileNameList_sp)
+        if store_wfc:
+            for isp in range(nspin):
+                fileNameList_sp = [] 
+                for ik in range(nks):
+                    fileNameList_ik = [] 
+                    for iwf in range(nbnd[isp]):
+                        fileName = storeFolder + '/wfc_' + str(isp + 1) + '_' + str(ik + 1).zfill(3) + '_' + str(iwf + 1).zfill(5) + '_r.npy'
+                        fileNameList_ik.append(fileName)
+                    fileNameList_sp.append(fileNameList_ik)
+                fileNameList_tot[isp] = np.array(fileNameList_sp)
 
-        if rank == 0:
-            total_iter = np.sum(nbnd)
-            pbar = tqdm(desc='store wfc', total=total_iter)
+            if rank == 0:
+                total_iter = np.sum(nbnd)
+                pbar = tqdm(desc='store wfc', total=total_iter)
 
-        for event, element in context:
-            if element.tag == "grid_function":
-                encoding = element.get("encoding")
-                if index_mp % size == rank:
-                    wfc_ = element.text
-                    dtype = np.double
-                    if encoding.strip() == "text":
-                        wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
-                        wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
-                        wfc = np.transpose(wfc, (2, 1, 0))
-                        np.save(fileName, wfc)
-                    else:
-                        wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
-                        wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
-                        fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
-                        wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
-                        wfc = np.transpose(wfc, (2, 1, 0))
-                        np.save(fileName, wfc)
-                    if rank == 0:
-                        value = size
-                        if total_iter - index_mp < value:
-                            value = total_iter - index_mp 
-                        pbar.update(value)
-                iwfc = (iwfc + 1) % nbnd[ispin]
-                if iwfc == 0:
-                    ispin += 1
-                index_mp += 1
-            element.clear()
-        if rank == 0:
-            pbar.close()
+            for event, element in context:
+                if element.tag == "grid_function":
+                    encoding = element.get("encoding")
+                    if index_mp % size == rank:
+                        wfc_ = element.text
+                        dtype = np.double
+                        if encoding.strip() == "text":
+                            wfc_flatten = np.fromstring(wfc_, dtype=dtype, sep=' ')
+                            fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                            wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
+                            wfc = np.transpose(wfc, (2, 1, 0))
+                            np.save(fileName, wfc)
+                        else:
+                            wfc_byte = base64.decodebytes(bytes(wfc_, 'utf-8'))
+                            wfc_flatten = np.frombuffer(wfc_byte, dtype=dtype)
+                            fileName = storeFolder + '/wfc_' + str(ispin + 1) + '_' + str(1).zfill(3) + '_' + str(iwfc + 1).zfill(5) + '_r'
+                            wfc = wfc_flatten.reshape([fftw[2], fftw[1], fftw[0]])
+                            wfc = np.transpose(wfc, (2, 1, 0))
+                            np.save(fileName, wfc)
+                        if rank == 0:
+                            value = size
+                            if total_iter - index_mp < value:
+                                value = total_iter - index_mp 
+                            pbar.update(value)
+                    iwfc = (iwfc + 1) % nbnd[ispin]
+                    if iwfc == 0:
+                        ispin += 1
+                    index_mp += 1
+                element.clear()
+            if rank == 0:
+                pbar.close()
 
         # npv
         fac = np.sqrt(4 * ecut) / 2.0 / np.pi
@@ -240,9 +247,14 @@ class QBOXRead(Read):
             self.comm.Barrier()
         return wfc_dict
 
-    def read(self, saveFileFolder, storeFolder, ):
-        self.parse_info(saveFileFolder=saveFileFolder, store=True, storeFolder='./wfc/')
-        self.parse_wfc(file_name=saveFileFolder, storeFolder=storeFolder)
+    def read(self,
+             storeFolder: str,
+             real_space: bool=True,
+             store_wfc: bool = True,
+             ):
+        self.parse_info()
+        self.parse_wfc(storeFolder=storeFolder,
+                       store_wfc=store_wfc)
 
     def info(self):
         print("----------------QBOX XML-------------------")
@@ -314,8 +326,8 @@ if __name__ == "__main__":
     # test
     st = time.time()
 
-    qbox = QBOXRead(comm=comm)
-    qbox.parse_info(args.xml)
+    qbox = QBOXRead(comm=comm, outFolder=args.xml)
+    qbox.parse_info()
     qbox.parse_wfc()
 
     # get the end time

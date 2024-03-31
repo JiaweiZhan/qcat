@@ -33,7 +33,7 @@ class LDOS:
         if self.comm:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
-        self.read_obj.read(saveFileFolder=self.saveFolder, storeFolder=self.storeFolder)
+        self.read_obj.read(storeFolder=self.storeFolder)
 
         with open(storeFolder + '/info.pickle', 'rb') as handle:
             xml_data = pickle.load(handle)
@@ -140,9 +140,9 @@ if __name__=="__main__":
     rank = comm.Get_rank()
     st = time.time()
 
-    qe = qe_io.QERead(comm)
-    qe.parse_info('../../bn.save/')
-    qe.parse_wfc('../../bn.save/')
+    qe = qe_io.QERead(comm = comm, outFolder="../../bn.save")
+    qe.parse_info()
+    qe.parse_wfc()
 
     # get the end time
     et = time.time()

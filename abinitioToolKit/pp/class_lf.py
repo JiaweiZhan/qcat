@@ -153,7 +153,7 @@ if __name__=="__main__":
 
     # ------------------------------------------- read and store wfc --------------------------------------------
     
-    qbox = qbox_io.QBOXRead(comm=comm)
+    qbox = qbox_io.QBOXRead(comm=comm, outFolder=args.saveFileFolder)
     storeFolder = './wfc/'
 
     comm.Barrier()
@@ -161,7 +161,7 @@ if __name__=="__main__":
     if not isExist:
         if rank == 0:
             print(f"store wfc from {storeFolder}")
-        qbox.read(args.saveFileFolder, storeFolder=storeFolder)
+        qbox.read(storeFolder=storeFolder, store_wfc=True)
     else:
         if rank == 0:
             print(f"read stored wfc from {storeFolder}")
