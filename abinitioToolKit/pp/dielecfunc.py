@@ -1,5 +1,12 @@
 from lxml import etree
 import numpy as np
+USE_CUPY = True
+try:
+    import cupy
+    from ..utils.gpu_kernel.utils_gpu import gaussian3d_gpu as gaussian3d
+except ImportError:
+    USE_CUPY = False
+    from ..utils.gpu_kernel.utils_cpu import gaussian3d_cpu as gaussian3d
 
 class DielecFunc(object):
     def __init__(self, xml_fname):
@@ -115,7 +122,8 @@ class DielecFunc(object):
             self.dspl[ispin] = np.stack(dspls[ispin], axis=0)
             self.spread[ispin] = np.stack(spreads[ispin], axis=0)
 
-    def gaussian3d(self,
+    @staticmethod
+    def gaussian3d(unit_cell,      # [3, 3]
                    r1: np.ndarray, # [ngrid, 3] in relative scale
                    r2: np.ndarray, # [nefield // 2, nmlwf, 3] in relative scale
                    spread: np.ndarray, # [nefield //2, nmlwf, 1] in bohr unit
@@ -125,12 +133,7 @@ class DielecFunc(object):
         return shape: [nefield // 2, ngrid]
         FIXME: this function is not optimized, GPU acceleration per grid is possible.
         '''
-        diff = r1[None, :, None, :] - r2[:, None, :, :] # [nefield // 2, ngrid, nmlwf, 3]
-        diff = (diff + 0.5) % 1 - 0.5
-        diff_norm = np.linalg.norm(diff @ self.unit_cell, axis=-1) # [nefield // 2, ngrid, nmlwf]
-        dspl_norm = dspl_norm.transpose(0, 2, 1)                   # [nefield // 2, 1, nmlwf]
-        spread = spread.transpose(0, 2, 1)                   # [nefield // 2, 1, nmlwf]
-        return np.sum(dspl_norm * np.exp(-0.5 * diff_norm ** 2 / spread ** 2) / ((2 * np.pi * spread ** 2) ** 1.5), axis=-1) # [nefield // 2, ngrid]
+        return gaussian3d(unit_cell, r1, r2, spread, dspl_norm)
 
     def computeLocalPolarization(self):
         self.MLWFCenterDspl()
@@ -146,7 +149,7 @@ class DielecFunc(object):
             center = self.center[ispin]
             spread = self.spread[ispin]
             dspl_norm = np.sum(self.dspl[ispin] * mask[::2][:, None, :], axis=-1, keepdims=True)
-            self.polarization[ispin] =  self.gaussian3d(r1, center, spread, dspl_norm).reshape((-1, *self.npv)) * -1.0
+            self.polarization[ispin] =  self.gaussian3d(self.unit_cell, r1, center, spread, dspl_norm).reshape((-1, *self.npv)) * -1.0
 
     def computeDielecFunc(self):
         self.computeLocalPolarization()
