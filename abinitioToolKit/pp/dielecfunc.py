@@ -1,12 +1,6 @@
 from lxml import etree
 import numpy as np
-USE_CUPY = True
-try:
-    import cupy
-    from ..utils.gpu_kernel.utils_gpu import gaussian3d_gpu as gaussian3d
-except ImportError:
-    USE_CUPY = False
-    from ..utils.gpu_kernel.utils_cpu import gaussian3d_cpu as gaussian3d
+from ..utils.gpu_kernel.utils import gaussian3d
 
 class DielecFunc(object):
     def __init__(self, xml_fname):
