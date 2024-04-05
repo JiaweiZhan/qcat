@@ -27,7 +27,7 @@ def gaussian3d(unit_cell,      # [3, 3]
         free_memory, _ = np.cuda.runtime.memGetInfo()
         ngrid = r1.shape[0]
         nefield, nmlwf, _ = r2.shape
-        nr1 = free_memory // (r1.itemsize * nefield * nmlwf * 3 * 2)
+        nr1 = free_memory // (r1.itemsize * nefield * nmlwf * 3 * 10)
         lenr1 = (ngrid - 1) // nr1 + 1
         result = []
         for i in range(lenr1):
