@@ -169,6 +169,16 @@ class DielecFunc(object):
         else:
             return eps[0] + eps[1] - 1.0
 
+    def write2qbox(self,
+                   eps: np.ndarray,
+                   fname: str = 'alpha.txt'):
+        with open(fname, 'w') as f:
+            for k in range(self.npv[2]):
+                for i in range(self.npv[0]):
+                    for j in range(self.npv[1]):
+                        f.write(f"{eps[i, j, k]:15.8f}")
+                f.write('\n')
+
 
     def __str__(self):
         return f"npv:\n{self.npv}\n\nff_amplitude:\n{self.ff_amplitude}\n\nunit_cell:\n{self.unit_cell}\n\n\
