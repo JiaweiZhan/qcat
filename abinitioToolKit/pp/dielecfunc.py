@@ -55,6 +55,8 @@ class DielecFunc(object):
 
             if element.tag == 'mlwf_set':
                 ispin = int(element.attrib['spin'])
+                if ispin == 1:
+                    self.nspin = 2
                 mlwf_center = []
                 mlwf_spread = []
                 mlwf_occupation = []
