@@ -1,8 +1,14 @@
-USE_GPU = False
+USE_GPU = True
 try:
     import cupy as np
-    USE_GPU = True
+    try:
+        USE_GPU = np.cuda.is_available()
+    except:
+        USE_GPU = False
 except ImportError:
+    USE_GPU = False
+
+if not USE_GPU:
     import numpy as np
 import numpy as numpy
 
