@@ -78,7 +78,7 @@ if __name__ == "__main__":
         for ibnd_i in range(nbnd[ispin]): 
             if ibnd_i % size == rank:
                 for iks in range(nks):
-                    fileName = fileNameList[ispin, iks, ibnd_i]
+                    fileName = fileNameList[ispin][iks, ibnd_i]
                     wfc_i = np.load(fileName)
                     ipr_loc[ibnd_i, iks] = np.sum(np.absolute(wfc_i) ** 4) / (np.sum(np.absolute(wfc_i) ** 2) ** 2)
 
