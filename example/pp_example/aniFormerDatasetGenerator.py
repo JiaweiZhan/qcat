@@ -1,6 +1,6 @@
 # only support qbox yet
-from abinitioToolKit import qbox_io
-from abinitioToolKit import utils
+from qcat.io_kernel import qbox_io
+from qcat.utils import utils
 from mpi4py import MPI
 import argparse
 from functools import partial
