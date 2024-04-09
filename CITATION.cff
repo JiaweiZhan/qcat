@@ -5,6 +5,6 @@ authors:
     given-names: Jiawei
     orcid: "https://orcid.org/0000-0001-5143-5467"
 title: abinitioToolKit
-version: 0.0.1
+version: 0.1.0
 date-released: 2023-05-09
 repository-code: https://github.com/JiaweiZhan/abinitioToolKit

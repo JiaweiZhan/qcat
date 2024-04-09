@@ -5,14 +5,8 @@ from distutils.core import setup
 
 setup(
     name='abinitioToolKit',
-    version='0.0',
+    version='0.1.0',
     packages=['abinitioToolKit',
-              # 'abinitioToolKit/io',
-              # 'abinitioToolKit/qe_io',
-              # 'abinitioToolKit/utils',
-              # 'abinitioToolKit/qbox_io',
-              # 'abinitioToolKit/class_lf',
-              # 'abinitioToolKit/class_ldos',
               ],
     # find_packages(exclude=[]),
     install_requires=[
@@ -24,7 +18,8 @@ setup(
         "scipy",
         "tqdm",
         "scikit-learn",
-        "PyYAML"
+        "PyYAML",
+        "pyscf"
         ],
     include_package_data=True,
 )
