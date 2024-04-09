@@ -1,2 +1,2 @@
 from .utils import *
-from .gpu_kernel import *
+from .gpu_kernels import *

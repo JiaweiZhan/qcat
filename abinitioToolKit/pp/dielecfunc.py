@@ -1,6 +1,6 @@
 from lxml import etree
 import numpy as np
-from ..utils.gpu_kernel.utils import gaussian3d
+from ..utils.gpu_kernels import gaussian3d
 
 class DielecFunc(object):
     def __init__(self, xml_fname):
