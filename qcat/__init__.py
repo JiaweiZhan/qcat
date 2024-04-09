@@ -14,7 +14,7 @@ def header():
     """Prints welcome header."""
     import datetime
 
-    print("abinitioToolKit version : ", __version__)
+    print("qcat version            : ", __version__)
     print("Use GPU                 : ", USE_GPU)
     print("Today                   : ", datetime.datetime.today())
 
