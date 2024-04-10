@@ -2,7 +2,8 @@ from pyscf import pbc
 from typing import List, Tuple
 import os
 import numpy as np
-from scipy.special import sph_harm
+from e3nn.o3 import spherical_harmonics
+import torch
 
 from .basisReader import lcaoReader
 
@@ -46,23 +47,6 @@ class lcaoGenerator(object):
         for atom in set(self.species_):
             assert atom in basis_element_type, f'{atom} is not in the basis set'
 
-    @staticmethod
-    def real_sph_harm(m, l, phi, theta):
-        '''
-        n | l | m quantum number
-        phi: azimuthal angle
-        theta: polar angle
-        '''
-        if m == 0:
-            angular_part = sph_harm(m, l, phi, theta).real
-        elif m < 0:
-            angular_part = complex(0, 1) * np.sqrt(0.5) * (sph_harm(m, l, phi, theta) - (-1) ** (-m) * sph_harm(-m, l, phi, theta))
-            angular_part = angular_part.real
-        else:
-            angular_part = np.sqrt(0.5) * (sph_harm(-m, l, phi, theta) + (-1) ** m * sph_harm(m, l, phi, theta))
-            angular_part = angular_part.real
-        return angular_part
-
     def eval_ao(self,
                 ):
         fftw = self.fft_
@@ -78,47 +62,46 @@ class lcaoGenerator(object):
         diff = (diff + 0.5) % 1 - 0.5
         diff = diff @ np.asarray(self.cell_.a)              # [natom, ngrid, 3]
         r_norm = np.linalg.norm(diff, axis=-1)              # [natom, ngrid]
-        theta = np.arccos(np.divide(diff[:, :, 2], r_norm, out=np.zeros_like(r_norm), where=r_norm!=0)) # [natom, ngrid]
-        phi = np.arctan2(diff[:, :, 1], diff[:, :, 0])                                                  # [natom, ngrid]
+        mask = r_norm < 11.0
 
         basis_o = {}
         for basis in self.basis_:
             species = basis.element_type
             idx = np.asarray(self.species_) == species
             natom_species = np.sum(idx)
-            r_norm_idx = np.round(r_norm[idx] / basis.dr).astype(np.int32) # [natom_species, ngrid]
+            r_norm_l = r_norm[idx][mask[idx]]
+            r_norm_idx = np.round(r_norm_l / basis.dr).astype(np.int32) # [nvaild_grid * natom_species]
             r_norm_idx = np.clip(r_norm_idx, 0, basis.mesh - 1)
 
-            phi_l = phi[idx]
-            theta_l = theta[idx]
-
             results = []
-            atom_idx = []
             nlm = []
-            for key, value in basis.basis_set.items():
+            l_pre = 0
+            for ibasis, (key, value) in enumerate(basis.basis_set.items()):
                 (n, l) = key
+                if ibasis == 0 or l != l_pre:
+                    diff_l = torch.from_numpy(diff[idx][mask[idx]]).roll(-1, -1)
+                    angular_part = spherical_harmonics(l, diff_l, normalize=True).numpy() # [nvalid_grid * natom_species, 2l+1]
+                    l_pre = l
+                basis_val_l = value[r_norm_idx][:, None] * angular_part                     # [nvalid_grid * natom_species, 2l+1]
+                basis_val = np.zeros((natom_species, np.asarray(fftw).prod(), 2 * l + 1))
+                basis_val[mask[idx]] = basis_val_l
+                norm = np.mean(np.square(basis_val), axis=1, keepdims=True) * self.cell_.vol
+                basis_val /= np.sqrt(norm)
+                results.append(basis_val.reshape(natom_species, *fftw, 2 * l + 1).transpose(4, 0, 1, 2, 3)) # [2l+1, natom_species, x, y, z]
                 for m in range(-l, l + 1):
-                    angular_part = self.real_sph_harm(m, l, phi_l, theta_l)
-                    basis_val = value[r_norm_idx] * angular_part
-                    norm = np.mean(np.square(basis_val)) * self.cell_.vol
-                    basis_val /= np.sqrt(norm)
-                    results.append(basis_val.reshape(natom_species, *fftw))
-                    for i in range(natom_species):
-                        atom_idx.append(i + 1)
-                        nlm.append([str(n), str(l), str(m)])
-            basis_o[basis.element_type] = (np.asarray(atom_idx), np.asarray(nlm), np.concatenate(results))
+                    nlm.append([str(n), str(l), str(m)])
+            basis_o[basis.element_type] = (np.asarray(nlm), np.concatenate(results))
 
         atom_mem = {}
         for atom in set(self.species_):
-            atom_mem[atom] = 1
+            atom_mem[atom] = 0
 
         name_f, basis_f = [], []
         for atom in self.species_:
-            basis_a_idx = basis_o[atom][0] == atom_mem[atom]
-            nlm_l = basis_o[atom][1][basis_a_idx]
-            name = [' '.join([str(atom_mem[atom]), atom, n, l, m]) for n, l, m in nlm_l]
-            name_f.extend(name)
-            basis_f.append(basis_o[atom][2][basis_a_idx])
+            nlm_l = basis_o[atom][0]
+            for n, l, m in nlm_l:
+                name_f.append(' '.join([str(atom_mem[atom] + 1), atom, n, l, m]))
+            basis_f.append(basis_o[atom][1][:, atom_mem[atom], :, :])
             atom_mem[atom] += 1
         self.spheric_labels_ = name_f
         return np.concatenate(basis_f)

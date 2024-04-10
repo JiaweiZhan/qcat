@@ -19,7 +19,8 @@ setup(
         "tqdm",
         "scikit-learn",
         "PyYAML",
-        "pyscf"
+        "pyscf",
+        "e3nn",
         ],
     include_package_data=True,
 )
