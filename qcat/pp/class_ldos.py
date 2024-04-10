@@ -2,7 +2,7 @@ import numpy as np
 from tqdm import tqdm
 import os, time, pathlib
 import threading
-from abinitioToolKit.io_kernel import qe_io
+from qcat.io_kernel import qe_io
 import shutil
 from mpi4py import MPI
 import pickle

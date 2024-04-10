@@ -3,8 +3,8 @@ from pyscf.pbc.dft import numint
 from typing import List, Any
 import numpy as np
 
-from abinitioToolKit.density2AO import CubeReader
-from abinitioToolKit.density2AO import setup_logger
+from qcat.density2AO import CubeReader
+from qcat.density2AO import setup_logger
 from loguru import logger
 
 class DF:

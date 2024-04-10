@@ -4,8 +4,8 @@ this file contains the class for compute LF that can be used in LRS-DDH
 import numpy as np
 import argparse
 import os, time
-from abinitioToolKit.io_kernel import qbox_io
-from abinitioToolKit.utils import utils
+from qcat.io_kernel import qbox_io
+from qcat.utils import utils
 import shutil
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import zoom
