@@ -10,8 +10,8 @@ from tqdm import tqdm
 import shutil
 import os
 
-from abinitioToolKit import utils
-from abinitioToolKit.io_kernel.base_io import Read
+from qcat.utils import utils
+from qcat.io_kernel.base_io import Read
 
 class QBOXRead(Read):
 
