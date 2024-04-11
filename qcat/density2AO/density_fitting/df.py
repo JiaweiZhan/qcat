@@ -22,6 +22,8 @@ class DF:
         self.pyscf_obj_ = pbc.gto.Cell()
         self.coeff_ = np.empty(0)
         self.f_density_ = np.empty(0)
+        self.use_nonpyscf_basis = False
+        self.basis_wrapper = None
         self.build_cell(basis=basis,
                         unit=unit,
                         exp_to_discard=exp_to_discard)
@@ -59,9 +61,10 @@ class DF:
             basis_cpu = basis_cpu.reshape([*list(nxyz), -1])
             basis_cpu = np.transpose(basis_cpu, axes=(3, 0, 1, 2)) # (nAO, nx, ny, nz)
         else:
+            self.use_nonpyscf_basis = True
             assert lcao_fname is not None, "LCAO basis file is not provided"
-            lcao = lcaoGenerator(cell=self.cell, basis_fname=lcao_fname, fftw=nxyz)
-            basis_cpu = lcao.eval_ao()
+            self.basis_wrapper = lcaoGenerator(cell=self.cell, basis_fname=lcao_fname, fftw=nxyz)
+            basis_cpu = self.basis_wrapper.eval_ao()
         return basis_cpu
 
     @staticmethod
@@ -105,6 +108,7 @@ class DF:
                       use_lcao: bool = False,
                       lcao_fname = None,
                       )->np.ndarray:
+        self.use_nonpyscf_basis = use_lcao
         # Compute the basis set
         if basis is None:
             basis = self.get_basis(shls_slice=shls_slice,
@@ -129,7 +133,10 @@ class DF:
     @property
     def spheric_labels(self,
                        )->List:
-        return self.pyscf_obj_.spheric_labels()
+        if self.use_nonpyscf_basis:
+            return self.basis_wrapper.spheric_labels
+        else:
+            return self.pyscf_obj_.spheric_labels()
 
     @property
     def cell(self,
