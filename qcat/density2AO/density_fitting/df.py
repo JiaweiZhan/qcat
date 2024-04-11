@@ -5,6 +5,7 @@ import numpy as np
 
 from qcat.density2AO import CubeReader
 from qcat.density2AO import setup_logger
+from qcat.basis import lcaoGenerator
 from loguru import logger
 
 class DF:
@@ -46,14 +47,21 @@ class DF:
     def get_basis(self,
                   shls_slice=None,
                   cutoff=None,
+                  use_lcao: bool = False,
+                  lcao_fname = None,
                   )->np.ndarray:
         nxyz = self.density_.data.shape
-        grid = self.pyscf_obj_.get_uniform_grids(nxyz)
+        if not use_lcao:
+            grid = self.pyscf_obj_.get_uniform_grids(nxyz)
 
-        # Compute AO values on the grid
-        basis_cpu = np.asarray(numint.eval_ao(self.pyscf_obj_, grid, shls_slice=shls_slice, cutoff=cutoff))
-        basis_cpu = basis_cpu.reshape([*list(nxyz), -1])
-        basis_cpu = np.transpose(basis_cpu, axes=(3, 0, 1, 2)) # (nAO, nx, ny, nz)
+            # Compute AO values on the grid
+            basis_cpu = np.asarray(numint.eval_ao(self.pyscf_obj_, grid, shls_slice=shls_slice, cutoff=cutoff))
+            basis_cpu = basis_cpu.reshape([*list(nxyz), -1])
+            basis_cpu = np.transpose(basis_cpu, axes=(3, 0, 1, 2)) # (nAO, nx, ny, nz)
+        else:
+            assert lcao_fname is not None, "LCAO basis file is not provided"
+            lcao = lcaoGenerator(cell=self.cell, basis_fname=lcao_fname, fftw=nxyz)
+            basis_cpu = lcao.eval_ao()
         return basis_cpu
 
     @staticmethod
@@ -94,10 +102,15 @@ class DF:
                       basis = None,
                       shls_slice=None,
                       cutoff=None,
+                      use_lcao: bool = False,
+                      lcao_fname = None,
                       )->np.ndarray:
         # Compute the basis set
         if basis is None:
-            basis = self.get_basis(shls_slice=shls_slice, cutoff=cutoff) # basis on cpu
+            basis = self.get_basis(shls_slice=shls_slice,
+                                   cutoff=cutoff,
+                                   use_lcao=use_lcao,
+                                   lcao_fname=lcao_fname) # basis on cpu
 
         # Compute the overlap matrix
         ovm = self.compute_overlap(self.cell, analytical, basis)
