@@ -13,19 +13,15 @@ def gaussian3d(unit_cell,      # [3, 3]
     FIXME: this function is not optimized, GPU acceleration per grid is possible.
     '''
     with torch.no_grad():
-        unit_cell = torch.from_numpy(unit_cell)
-        r1 = torch.from_numpy(r1)
-        r2 = torch.from_numpy(r2)
-        spread = torch.from_numpy(spread)
-        dspl_norm = torch.from_numpy(dspl_norm)
+        unit_cell = torch.as_tensor(unit_cell, device=device)
+        r2 = torch.as_tensor(r2, device=device)
+        spread = torch.as_tensor(spread, device=device)
+        dspl_norm = torch.as_tensor(dspl_norm, device=device)
+
         if not torch.cuda.is_available():
+            r1 = torch.as_tensor(r1, device=device)
             return gaussian3d_helper(unit_cell, r1, r2, spread, dspl_norm)
         else:
-            unit_cell = unit_cell.to(device)
-            r2 = r2.to(device)
-            spread = spread.to(device)
-            dspl_norm = dspl_norm.to(device)
-
             free_memory, _ = torch.cuda.mem_get_info()
             ngrid = r1.shape[0]
             nefield, nmlwf, _ = r2.shape
@@ -35,7 +31,7 @@ def gaussian3d(unit_cell,      # [3, 3]
             for i in range(lenr1):
                 low = i * nr1
                 high = min(ngrid, (i + 1) * nr1)
-                r1_gpu = r1[low : high].to(device)
+                r1_gpu = torch.as_tensor(r1[low : high], device=device)
                 result.append(gaussian3d_helper(unit_cell, r1_gpu, r2, spread, dspl_norm))
             return torch.cat(result, dim=-1).cpu().numpy()
 

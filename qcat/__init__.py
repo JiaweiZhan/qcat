@@ -8,7 +8,16 @@ try:
 except ImportError:
     USE_GPU = False
 
+import torch
+import os
+
 __version__ = "0.1.0"
+
+def set_nthread():
+    if USE_GPU:
+        torch.set_num_threads(1)
+    else:
+        torch.set_num_threads(os.cpu_count() - 1)
 
 def header():
     """Prints welcome header."""
@@ -20,3 +29,4 @@ def header():
 
 
 header()
+set_nthread()
