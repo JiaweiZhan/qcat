@@ -1,20 +1,20 @@
 from ase import data
 import numpy as np
+from .base_provider import BaseProvider
 
 pt = data.chemical_symbols
 
-class CubeReader:
+class CubeProvider(BaseProvider):
     def __init__(self,
                  filename: str,
                  roll: bool = True):
+        super().__init__(filename)
         self.filename_ = filename
         self.data_ = np.empty(0)
-        self.cell_ = np.empty(0)
-        self.atom_ = ""
-        self.read_cube(roll)
+        self.parse_file(roll)
 
-    def read_cube(self,
-                  roll: bool = True):
+    def parse_file(self,
+                   roll: bool = True):
         with open(self.filename_, 'r') as f:
             # Read the first 2 lines
             for _ in range(2):
@@ -26,6 +26,7 @@ class CubeReader:
             # read nx, ny, nz
             cell_info = np.array([[float(i) for i in f.readline().split()] for _ in range(3)])
             nxyz = cell_info[:, 0].astype(int)
+            self.nxyz_ = nxyz
             cell = cell_info[:, 1:]
             self.cell_ = np.multiply(cell, nxyz[:, None].repeat(3, axis=1))
 
@@ -49,15 +50,6 @@ class CubeReader:
             self.data_ = np.roll(self.data_, nxyz[1] // 2, axis=1)
             self.data_ = np.roll(self.data_, nxyz[2] // 2, axis=2)
 
-
     @property
     def data(self)->np.ndarray:
         return self.data_
-
-    @property
-    def cell(self)->np.ndarray:
-        return self.cell_
-
-    @property
-    def atom(self)->str:
-        return self.atom_

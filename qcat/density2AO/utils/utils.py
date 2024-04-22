@@ -1,11 +1,11 @@
 import plotly.graph_objects as go
 import numpy as np
 import os
-from .logging import setup_logger
+from qcat.utils import setLogger
 from loguru import logger
 from scipy.ndimage import zoom
 
-setup_logger(level='INFO')
+setLogger(level='INFO')
 
 def visualize_3D(data: np.ndarray,
                  level = None,

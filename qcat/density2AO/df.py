@@ -1,12 +1,13 @@
 from pyscf import pbc
-from pyscf.pbc.dft import numint
-from typing import List, Any
+from typing import List
 import numpy as np
 
-from qcat.density2AO import CubeReader
-from qcat.density2AO import setup_logger
-from qcat.basis import lcaoGenerator
+from qcat.io_kernel import CubeProvider
+from qcat.utils import setLogger
 from loguru import logger
+from qcat.io_kernel import pyscfHelper
+
+setLogger(level='INFO')
 
 class DF:
     def __init__(self,
@@ -18,33 +19,15 @@ class DF:
                  debug: bool = False,
                  ):
         self.filename_ = filename
-        self.density_ = CubeReader(filename, roll)
-        self.pyscf_obj_ = pbc.gto.Cell()
+        self.density_ = CubeProvider(filename, roll)
+        self.pyscf_wrapper = pyscfHelper(self.density_, basis=basis,
+                                         unit=unit, exp_to_discard=exp_to_discard)
         self.coeff_ = np.empty(0)
         self.f_density_ = np.empty(0)
-        self.use_nonpyscf_basis = False
-        self.basis_wrapper = None
-        self.build_cell(basis=basis,
-                        unit=unit,
-                        exp_to_discard=exp_to_discard)
         if debug:
-            setup_logger(level='DEBUG')
+            setLogger(level='DEBUG')
         else:
-            setup_logger(level='INFO')
-
-    def build_cell(self,
-                   basis: str = "cc-pvdz-jkfit",
-                   unit: str = "B",
-                   exp_to_discard = None,
-                   ):
-        cell = self.density_.cell
-        atom = self.density_.atom
-        self.pyscf_obj_.atom = atom
-        self.pyscf_obj_.a = cell
-        self.pyscf_obj_.unit = unit
-        self.pyscf_obj_.basis = basis
-        self.pyscf_obj_.exp_to_discard = exp_to_discard
-        self.pyscf_obj_.build()
+            setLogger(level='INFO')
 
     def get_basis(self,
                   shls_slice=None,
@@ -52,25 +35,13 @@ class DF:
                   use_lcao: bool = False,
                   lcao_fname = None,
                   )->np.ndarray:
-        nxyz = self.density_.data.shape
-        if not use_lcao:
-            grid = self.pyscf_obj_.get_uniform_grids(nxyz)
-
-            # Compute AO values on the grid
-            basis_cpu = np.asarray(numint.eval_ao(self.pyscf_obj_, grid, shls_slice=shls_slice, cutoff=cutoff))
-            basis_cpu = basis_cpu.reshape([*list(nxyz), -1])
-            basis_cpu = np.transpose(basis_cpu, axes=(3, 0, 1, 2)) # (nAO, nx, ny, nz)
-        else:
-            self.use_nonpyscf_basis = True
-            assert lcao_fname is not None, "LCAO basis file is not provided"
-            self.basis_wrapper = lcaoGenerator(cell=self.cell, basis_fname=lcao_fname, fftw=nxyz)
-            basis_cpu = self.basis_wrapper.eval_ao()
-        return basis_cpu
+        return self.pyscf_wrapper.get_basis(shls_slice=shls_slice, cutoff=cutoff,
+                                            use_lcao=use_lcao, lcao_fname=lcao_fname)
 
     @staticmethod
     def compute_overlap(pyscf_obj: pbc.gto.Cell,
                         analytical: bool = True,
-                        basis: np.ndarray = None,
+                        basis=None,
                         )->np.ndarray:
         if analytical:
             ovm = np.asarray(pyscf_obj.pbc_intor('int1e_ovlp_sph'))
@@ -108,7 +79,6 @@ class DF:
                       use_lcao: bool = False,
                       lcao_fname = None,
                       )->np.ndarray:
-        self.use_nonpyscf_basis = use_lcao
         # Compute the basis set
         if basis is None:
             basis = self.get_basis(shls_slice=shls_slice,
@@ -117,10 +87,10 @@ class DF:
                                    lcao_fname=lcao_fname) # basis on cpu
 
         # Compute the overlap matrix
-        ovm = self.compute_overlap(self.cell, analytical, basis)
+        ovm = self.compute_overlap(self.pyscf_wrapper.cell, analytical, basis)
 
         # Compute the W matrix
-        w = self.compute_w(basis, self.density_.data, self.volume)
+        w = self.compute_w(basis, self.density_.data, self.pyscf_wrapper.cell.vol)
 
         # Compute the coefficients
         self.coeff_ = np.linalg.inv(ovm) @ w
@@ -133,15 +103,12 @@ class DF:
     @property
     def spheric_labels(self,
                        )->List:
-        if self.use_nonpyscf_basis:
-            return self.basis_wrapper.spheric_labels
-        else:
-            return self.pyscf_obj_.spheric_labels()
+        return self.pyscf_wrapper.spheric_labels
 
     @property
     def cell(self,
              )->pbc.gto.Cell:
-        return self.pyscf_obj_
+        return self.pyscf_wrapper.cell
 
     @property
     def coeff(self,
@@ -157,8 +124,3 @@ class DF:
     def f_density(self,
                  )->np.ndarray:
         return self.f_density_
-
-    @property
-    def volume(self,
-            )->Any:
-        return np.linalg.det(np.asarray(self.cell.a))
