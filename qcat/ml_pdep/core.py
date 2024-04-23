@@ -21,8 +21,8 @@ def clear_basis(basis: np.ndarray, # (nbasis, nx, ny, nz)
                 labels: List[str], # (nbasis,)
                 shls: List=['s', 'g', 'h', 'i', 'j'],
                 ):
-    orbitals = np.array([not find_characters_regex(a.split()[-1].strip(), shls) for a in labels])
-    return basis[orbitals], np.asarray(labels)[orbitals]
+    mask = np.array([not find_characters_regex(a.split()[-1].strip(), shls) for a in labels])
+    return basis[mask], np.asarray(labels)[mask], mask
 
 def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
           spectrum_eig: np.ndarray, # (npdep,)
