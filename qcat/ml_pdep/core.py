@@ -64,7 +64,7 @@ def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
         A_Q = spectrum_phi @ (((spectrum_phi.conj().T @ Q).real * 2) * spectrum_eig[:, None])  # Action of A on Q
         diff = np.linalg.norm(A_Q - Q @ np.diag(eigs), ord='fro')
 
-        logger.info(f"Iteration {iteration+1}, Diff: {diff}")
+        logger.info(f"Iteration {iteration+1}, Diff: {diff:^8.3e}")
 
         if diff < tol:
             logger.info("Convergence achieved.")

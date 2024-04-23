@@ -8,6 +8,8 @@ from scipy.linalg import eigh
 import math
 from typing import List
 from loguru import logger
+import torch
+import time
 
 from westpy import qe_io
 
@@ -60,11 +62,10 @@ class PDEP2AO(object):
         basis_cpu, labels = clear_basis(basis_cpu, self.pyscf_obj.spheric_labels, remove_shls)
         nbasis = basis_cpu.shape[0]
         logger.info(f"nbasis: {nbasis}")
-        basis_cpu = np.fft.fftn(basis_cpu, axes=(1, 2, 3), norm='forward')
+        basis_cpu = torch.fft.fftn(torch.as_tensor(basis_cpu, dtype=torch.float32), dim=(1, 2, 3), norm='forward').numpy()
         basis_g = np.zeros((nbasis, len(self.qe.mill)), dtype=basis_cpu.dtype) # [nbasis, nmill]
         mill_x, mill_y, mill_z = self.qe.mill.T
-        for i in range(nbasis):
-            basis_g[i] = basis_cpu[i][mill_x, mill_y, mill_z]
+        basis_g[:] = basis_cpu[:, mill_x, mill_y, mill_z]
         norm_basis_g = np.sqrt(np.diag((basis_g @ basis_g.T.conj()).real) * 2)
         basis_g /= norm_basis_g[:, None] # [nbasis, nmill]
         return basis_g, labels
@@ -86,10 +87,12 @@ class PDEP2AO(object):
             workdir='./log',
             prefix='westpy',
             **kwargs):
+        start_time = time.time()
         if not os.path.exists(workdir):
             os.makedirs(workdir)
         chi_decom_eigval, chi_decom_eigvec = self.getChiSpecDecomp() # [npdep], [npdep, nmill]
         npdep = chi_decom_eigval.size
+        logger.info("Compute Eigen for chi...")
         chi_eigval, chi_eigvec = self.decom2Eigen(chi_decom_eigval, chi_decom_eigvec) # [npdep], [npdep, nmill]
         basis_g, labels = self.getAO_G(**kwargs) # [nbasis, nmill]
         S = self.compute_S(basis_g) # [nbasis, nbasis]
@@ -110,16 +113,19 @@ class PDEP2AO(object):
 
         chi_eigval_fit, coeff = eigh(QAQ, S)
         chi_eigvec_fit = coeff.T @ basis_g # [nbasis, nmill]
-        chitil_decom_eigval_fit = chi_eigval_fit
-        chitil_decom_eigvec_fit = np.divide(chi_eigvec_fit,
+        chibar_decom_eigval_fit = chi_eigval_fit
+        chibar_decom_eigvec_fit = np.divide(chi_eigvec_fit,
                                             self.gd4pi,
                                             out=np.zeros_like(chi_eigvec_fit),
                                             where=self.gd4pi!=0) # [nbasis, nmill]
-        chitil_eigval_fit, chitil_eigvec_fit = self.decom2Eigen(chitil_decom_eigval_fit, chitil_decom_eigvec_fit) # [nbasis], [nbasis, nmill]
-        chi0til_eigval_fit = chitil_eigval_fit / (1 + chitil_eigval_fit)
+        logger.info("Compute Eigen for chibar...")
+        chibar_eigval_fit, chibar_eigvec_fit = self.decom2Eigen(chibar_decom_eigval_fit, chibar_decom_eigvec_fit) # [nbasis], [nbasis, nmill]
+        chi0bar_eigval_fit = chibar_eigval_fit / (1 + chibar_eigval_fit)
 
-        chi0til_eigval_fit = chi0til_eigval_fit[:npdep]
-        chitil_eigvec_fit = chitil_eigvec_fit[:npdep]
+        # chibar and chi0bar share same eigenvectors
+        chi0bar_eigval_fit = chi0bar_eigval_fit[:npdep]
+        chibar_eigvec_fit = chibar_eigvec_fit[:npdep]
 
-        self.qe.write_wstat(chi0til_eigval_fit, chitil_eigvec_fit, prefix=prefix, eig_mat='chi_0')
-        return chi0til_eigval_fit, chitil_eigvec_fit
+        self.qe.write_wstat(chi0bar_eigval_fit, chibar_eigvec_fit, prefix=prefix, eig_mat='chi_0')
+        logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
+        return chi0bar_eigval_fit, chibar_eigvec_fit
