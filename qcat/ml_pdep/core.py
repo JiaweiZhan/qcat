@@ -43,7 +43,10 @@ def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
 
     eigs = None
     for iteration in range(max_iter):
-        A_Q = spectrum_phi @ (((spectrum_phi.conj().T @ Q).real * 2.0) * spectrum_eig[:, None])  # Action of A on Q
+
+        # <phi|Q>
+        phiEigMat = (spectrum_phi.conj().T @ Q).real * 2
+        A_Q = spectrum_phi @ np.diag(spectrum_eig) @ phiEigMat  # Action of A on Q
 
         ngrid = A_Q.shape[0]
         if first_zero:
@@ -52,16 +55,15 @@ def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
             A_Q = np.vstack((A_Q, A_Q[1:].conj()))
         Q, _ = np.linalg.qr(A_Q)
         Q = Q[:ngrid]
-        A_Q = A_Q[:ngrid]
 
-        projections_Q = (spectrum_phi.conj().T @ Q).real * 2
-        scaled_projections_Q = projections_Q * spectrum_eig[:, None]
-        T = (Q.conj().T @ (spectrum_phi @ scaled_projections_Q)).real * 2
+        phiEigMat = (spectrum_phi.conj().T @ Q).real * 2
+        T = phiEigMat.T @ np.diag(spectrum_eig) @ phiEigMat
         eigs, vecs = np.linalg.eigh(T)
         Q = Q @ vecs
 
         # Use the estimated eigenvalues 'eigs' in the convergence criterion
-        A_Q = spectrum_phi @ (((spectrum_phi.conj().T @ Q).real * 2) * spectrum_eig[:, None])  # Action of A on Q
+        phiEigMat = (spectrum_phi.conj().T @ Q).real * 2
+        A_Q = spectrum_phi @ np.diag(spectrum_eig) @ phiEigMat  # Action of A on Q
         diff = np.linalg.norm(A_Q - Q @ np.diag(eigs), ord='fro')
 
         logger.info(f"Iteration {iteration+1}, Diff: {diff:^8.3e}")
