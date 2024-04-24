@@ -46,8 +46,9 @@ class PDEP2AO(object):
     @staticmethod
     def decom2Eigen(spec_val: np.ndarray, # [npdep]
                     spec_vec: np.ndarray, # [npdep, nmill],
+                    tol: float=1e-10,
                     ):
-        chi_eigval, chi_eigvec = oeigh(spec_vec.T, spec_val) # [nmill, npdep]
+        chi_eigval, chi_eigvec = oeigh(spec_vec.T, spec_val, tol=tol) # [nmill, npdep]
         return chi_eigval, chi_eigvec.T # [npdep, nmill]
 
 
@@ -104,17 +105,30 @@ class PDEP2AO(object):
             prefix: str='westpy',
             pyscf_overlap: bool=False,
             qaq_threshold=None,
+            precision: str='float',
+            tol: float=1e-1,
             **kwargs,
             ):
         start_time = time.time()
+
+        possible_precision = ['float', 'double']
+        assert precision in possible_precision, f"precision should be one of {possible_precision}"
         if not os.path.exists(workdir):
             os.makedirs(workdir)
         chi_decom_eigval, chi_decom_eigvec = self.getChiSpecDecomp() # [npdep], [npdep, nmill]
         npdep = chi_decom_eigval.size
         basis_g, labels, mask, S = self.getAO_G(**kwargs) # [nbasis, nmill]
 
+        if precision == 'float':
+            basis_g = basis_g.astype(np.complex64)
+            chi_decom_eigvec = chi_decom_eigvec.astype(np.complex64)
+            chi_decom_eigval = chi_decom_eigval.astype(np.float32)
+            if S is not None:
+                S = S.astype(np.float32)
+
         if S is None:
             S = self.compute_S(basis_g, pyscf_overlap, mask) # [nbasis, nbasis]
+
         QAQ = self.compute_QAQ(basis_g, chi_decom_eigvec, chi_decom_eigval) # [nbasis, nbasis]
 
         if qaq_threshold:
@@ -147,6 +161,7 @@ class PDEP2AO(object):
         logger.info("Compute Eigen for chibar...")
         chibar_eigval_fit, chibar_eigvec_fit = self.decom2Eigen(chibar_decom_eigval_fit,
                                                                 chibar_decom_eigvec_fit,
+                                                                tol=tol,
                                                                 ) # [nbasis], [nbasis, nmill]
         chi0bar_eigval_fit = chibar_eigval_fit / (1 + chibar_eigval_fit)
 
