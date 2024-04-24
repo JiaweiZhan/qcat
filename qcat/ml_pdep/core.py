@@ -7,22 +7,22 @@ from qcat.utils import setLogger
 
 setLogger()
 
-
-def find_characters_regex(input_string:str,
-                          char_list: List=['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j'],
-                          ):
-    pattern = f"[{''.join(char_list)}]"
-    if re.search(pattern, input_string):
-        return True
-    else:
-        return False
-
 def clear_basis(basis: np.ndarray, # (nbasis, nx, ny, nz)
                 labels: List[str], # (nbasis,)
                 shls: List=['s', 'g', 'h', 'i', 'j'],
                 ):
-    mask = np.array([not find_characters_regex(a.split()[-1].strip(), shls) for a in labels])
-    return basis[mask], np.asarray(labels)[mask], mask
+    """
+    Filters the basis and labels based on absence of specified shell types.
+    """
+    # Compile regex once
+    char_pattern = re.compile(f"[{''.join(shls)}]")
+
+    # Create a mask with vectorized operations
+    mask = np.array([bool(char_pattern.search(label.split()[-1].strip())) for label in labels])
+    mask = ~mask
+
+    # Apply mask to basis and labels
+    return basis[mask], np.array(labels)[mask], mask
 
 def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
           spectrum_eig: np.ndarray, # (npdep,)
