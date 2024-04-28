@@ -8,7 +8,7 @@ from mpi4py import MPI
 import time
 import pathlib
 import shutil
-from .base_io import Read
+from qcat.io_kernel.base.base_io import Read
 
 class QERead(Read):
 

@@ -3,7 +3,7 @@ from pyscf.pbc.dft import numint
 import numpy as np
 from typing import List
 
-from qcat.io_kernel.dft_provider.base_provider import BaseProvider
+from qcat.io_kernel.base.base_provider import BaseProvider
 from qcat.basis import lcaoGenerator
 
 class pyscfHelper:

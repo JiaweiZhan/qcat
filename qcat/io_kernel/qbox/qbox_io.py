@@ -11,7 +11,7 @@ import shutil
 import os
 
 from qcat.utils import utils
-from qcat.io_kernel.base_io import Read
+from qcat.io_kernel.base.base_io import Read
 
 class QBOXRead(Read):
 

@@ -22,25 +22,26 @@ setLogger()
 class PDEP2AO(object):
     def __init__(self,
                  wfc_fname,
-                 wstat_folder,
-                 basis: str = "aug-cc-pvqz",
+                 wstat_folder=None,
+                 basis: str = "cc-pvqz",
                  unit: str = "B",
-                 exp_to_discard = None,
+                 exp_to_discard = 0.1,
                  ):
         assert os.path.exists(wfc_fname), f"{wfc_fname} does not exist"
-        assert os.path.exists(wstat_folder), f"{wstat_folder} does not exist"
+        if wstat_folder is not None:
+            assert os.path.exists(wstat_folder), f"{wstat_folder} does not exist"
 
         self.qe = qe_io(wfc_fname, wstat_folder)
         dft_provider = QEProvider(wfc_fname)
         self.pyscf_obj = pyscfHelper(dft_provider, basis, unit, exp_to_discard)
-        self.gd4pi = np.array([])
-
-    def getChiSpecDecomp(self):
         b = np.array([self.qe.b1, self.qe.b2, self.qe.b3])
         g_vec = self.qe.mill @ b      # [nmill, 3]
         g_vec_norm = np.linalg.norm(g_vec, axis=-1)
-        eigval = self.qe.pdepeig / (1 - self.qe.pdepeig)
         self.gd4pi = g_vec_norm[None, :] / math.sqrt(4 * math.pi) # [1, nmill]
+
+
+    def getChiSpecDecomp(self):
+        eigval = self.qe.pdepeig / (1 - self.qe.pdepeig)
         return eigval, self.qe.pdepg * self.gd4pi # [npdep, nmill]
 
     @staticmethod
@@ -100,6 +101,35 @@ class PDEP2AO(object):
         return (twoOrbitalMat.real * 2) @ np.diag(eigval) @ ((twoOrbitalMat.T.conj()).real * 2)
 
 
+    def compute_pdep(self,
+                     s: np.ndarray,
+                     qaq : np.ndarray,
+                     basis_g: np.ndarray,
+                     tol: float=1e-1,
+                     npdep=None,
+                     ):
+        chi_eigval_fit, coeff = eigh(qaq, s)
+        chi_eigvec_fit = coeff.T @ basis_g # [nbasis, nmill]
+        chibar_decom_eigval_fit = chi_eigval_fit
+        chibar_decom_eigvec_fit = np.divide(chi_eigvec_fit,
+                                            self.gd4pi,
+                                            out=np.zeros_like(chi_eigvec_fit),
+                                            where=self.gd4pi!=0) # [nbasis, nmill]
+        logger.info("Compute Eigen for chibar...")
+        chibar_eigval_fit, chibar_eigvec_fit = self.decom2Eigen(chibar_decom_eigval_fit,
+                                                                chibar_decom_eigvec_fit,
+                                                                tol=tol,
+                                                                ) # [nbasis], [nbasis, nmill]
+        chi0bar_eigval_fit = chibar_eigval_fit / (1 + chibar_eigval_fit)
+
+        # chibar and chi0bar share same eigenvectors
+        if npdep is None:
+            npdep = chi0bar_eigval_fit.size
+        chi0bar_eigval_fit = chi0bar_eigval_fit[:npdep]
+        chibar_eigvec_fit = chibar_eigvec_fit[:npdep]
+        return chi0bar_eigval_fit, chibar_eigvec_fit
+
+
     def run(self,
             workdir: str='./log',
             prefix: str='westpy',
@@ -151,24 +181,30 @@ class PDEP2AO(object):
         np.save(qaq_fname, QAQ)
         logger.info(f"QAQ matrix is saved in {qaq_fname}")
 
-        chi_eigval_fit, coeff = eigh(QAQ, S)
-        chi_eigvec_fit = coeff.T @ basis_g # [nbasis, nmill]
-        chibar_decom_eigval_fit = chi_eigval_fit
-        chibar_decom_eigvec_fit = np.divide(chi_eigvec_fit,
-                                            self.gd4pi,
-                                            out=np.zeros_like(chi_eigvec_fit),
-                                            where=self.gd4pi!=0) # [nbasis, nmill]
-        logger.info("Compute Eigen for chibar...")
-        chibar_eigval_fit, chibar_eigvec_fit = self.decom2Eigen(chibar_decom_eigval_fit,
-                                                                chibar_decom_eigvec_fit,
-                                                                tol=tol,
-                                                                ) # [nbasis], [nbasis, nmill]
-        chi0bar_eigval_fit = chibar_eigval_fit / (1 + chibar_eigval_fit)
+        pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(S, QAQ, basis_g, tol, npdep)
 
-        # chibar and chi0bar share same eigenvectors
-        chi0bar_eigval_fit = chi0bar_eigval_fit[:npdep]
-        chibar_eigvec_fit = chibar_eigvec_fit[:npdep]
-
-        self.qe.write_wstat(chi0bar_eigval_fit, chibar_eigvec_fit, prefix=prefix, eig_mat='chi_0')
+        self.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
         logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
-        return chi0bar_eigval_fit, chibar_eigvec_fit
+        return pdep_eigval_fit, pdep_eigvec_fit
+
+def predPDEP(wfc_name: str,
+             qaq: np.ndarray,
+             s: np.ndarray,
+             npdep: int,
+             basis: str = "cc-pvqz",
+             unit: str = "B",
+             exp_to_discard = 0.1,
+             tol: float=1e-1,
+             workdir: str='./log',
+             prefix: str='pred_PDEP',
+             **kwargs):
+    start_time = time.time()
+    pdep2ao = PDEP2AO(wfc_name, basis=basis, unit=unit, exp_to_discard=exp_to_discard)
+    basis_g, _, _, _ = pdep2ao.getAO_G(**kwargs)
+    
+    pdep_eigval_fit, pdep_eigvec_fit = pdep2ao.compute_pdep(s, qaq, basis_g, tol, npdep)
+    if not os.path.exists(workdir):
+        os.makedirs(workdir)
+    pdep2ao.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
+    logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
+    return pdep_eigval_fit, pdep_eigvec_fit

@@ -1,8 +1,8 @@
 import numpy as np
 import os
 
-from .base_provider import BaseProvider
-from qcat.io_kernel import qe_io
+from qcat.io_kernel.base.base_provider import BaseProvider
+from .qe_io import QERead
 
 class QEProvider(BaseProvider):
     def __init__(self,
@@ -14,7 +14,7 @@ class QEProvider(BaseProvider):
 
     def parse_file(self):
         qe_outFolder = os.path.dirname(self.filename_)
-        qe = qe_io.QERead(qe_outFolder)
+        qe = QERead(qe_outFolder)
         qe_dict = qe.parse_info(store=False)
         self.cell_ = qe_dict['cell']
         qe_atom = qe_dict['atompos']

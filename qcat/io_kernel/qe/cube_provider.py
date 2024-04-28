@@ -1,6 +1,6 @@
 from ase import data
 import numpy as np
-from .base_provider import BaseProvider
+from qcat.io_kernel.base.base_provider import BaseProvider
 
 pt = data.chemical_symbols
 

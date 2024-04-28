@@ -1,9 +1,8 @@
 import numpy as np
-from typing import Tuple
 
 class BaseProvider:
     def __init__(self,
-                 filename: str,
+                 filename=None,
                  ):
         self.filename_ = filename
         self.cell_ = np.empty(0)
