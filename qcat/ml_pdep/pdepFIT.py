@@ -131,7 +131,7 @@ class PDEP2AO(object):
 
 
     def run(self,
-            workdir: str='./log',
+            outDir: str='./log',
             pyscf_overlap: bool=False,
             qaq_threshold=None,
             precision: str='float',
@@ -144,8 +144,8 @@ class PDEP2AO(object):
 
         possible_precision = ['float', 'double']
         assert precision in possible_precision, f"precision should be one of {possible_precision}"
-        if not os.path.exists(workdir):
-            os.makedirs(workdir)
+        if not os.path.exists(outDir):
+            os.makedirs(outDir)
         chi_decom_eigval, chi_decom_eigvec = self.getChiSpecDecomp() # [npdep], [npdep, nmill]
         npdep = chi_decom_eigval.size
         basis_g, labels, mask, S = self.getAO_G(**kwargs) # [nbasis, nmill]
@@ -169,44 +169,46 @@ class PDEP2AO(object):
         sparse_ratio = (QAQ==0.0).sum() / QAQ.size
         logger.info(f"QAQ matrix sparse ratio: {sparse_ratio*100:^5.2f}%.")
 
-        label_fname = os.path.join(workdir, 'orbital_labels.json')
+        label_fname = os.path.join(outDir, 'orbital_labels.json')
         with open(label_fname, 'w') as f:
             json.dump(labels.tolist(), f, indent=4)
         logger.info(f"Orbital labels are saved in {label_fname}")
 
-        s_fname = os.path.join(workdir, 'S.npy')
+        s_fname = os.path.join(outDir, 'S.npy')
         np.save(s_fname, S)
         logger.info(f"S matrix is saved in {s_fname}")
 
-        qaq_fname = os.path.join(workdir, 'QAQ.npy')
+        qaq_fname = os.path.join(outDir, 'QAQ.npy')
         np.save(qaq_fname, QAQ)
         logger.info(f"QAQ matrix is saved in {qaq_fname}")
 
         pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(S, QAQ, basis_g, tol, npdep)
 
         if save_pdep:
+            prefix = os.path.join(outDir, prefix)
             self.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
         logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
         return pdep_eigval_fit, pdep_eigvec_fit
 
-def predPDEP(wfc_name: str,
-             qaq: np.ndarray,
-             s: np.ndarray,
-             npdep: int,
-             basis: str = "cc-pvqz",
-             unit: str = "B",
-             exp_to_discard = 0.1,
-             tol: float=1e-1,
-             workdir: str='./log',
-             prefix: str='pred_PDEP',
-             **kwargs):
+def tcddrf2PDEP(wfc_name: str,
+                qaq: np.ndarray,
+                s: np.ndarray,
+                npdep: int,
+                basis: str = "cc-pvqz",
+                unit: str = "B",
+                exp_to_discard = 0.1,
+                tol: float=1e-1,
+                outDir: str='./log_tcddrf2PDEP',
+                prefix: str='tcddrf2PDEP',
+                **kwargs):
     start_time = time.time()
     pdep2ao = PDEP2AO(wfc_name, basis=basis, unit=unit, exp_to_discard=exp_to_discard)
     basis_g, _, _, _ = pdep2ao.getAO_G(**kwargs)
     
     pdep_eigval_fit, pdep_eigvec_fit = pdep2ao.compute_pdep(s, qaq, basis_g, tol, npdep)
-    if not os.path.exists(workdir):
-        os.makedirs(workdir)
+    if not os.path.exists(outDir):
+        os.makedirs(outDir)
+    prefix = os.path.join(outDir, prefix)
     pdep2ao.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
     logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
     return pdep_eigval_fit, pdep_eigvec_fit

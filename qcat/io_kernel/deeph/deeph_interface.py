@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import os
+import pathlib
 from scipy.sparse import csr_matrix
 from typing import List, Dict
 from ase.data import atomic_numbers, atomic_names
@@ -136,12 +137,12 @@ def write_sys_info(baseProvider: BaseProvider,
             json.dump(info, info_f)
     return site_norbits
 
-def pdep2deeph(s_mat: np.ndarray,
-               labels: List,
-               baseProvider: BaseProvider,
-               outDir: str = './log_pdep2deeph',
-               chi_mat=None,
-               ):
+def tcddrf2deeph(s_mat: np.ndarray,
+                 labels: List,
+                 baseProvider: BaseProvider,
+                 outDir: str = './log_tcddrf2deeph',
+                 chi_mat=None,
+                 ):
     if not os.path.exists(outDir):
         os.makedirs(outDir)
     site_norbits_dict, orbital_types_dict, element = label2orbital(labels, outDir=outDir)
@@ -167,14 +168,30 @@ def pdep2deeph(s_mat: np.ndarray,
         get_rh(outDir, outDir)
     return
 
-def deeph2pdep(hamiltonian_path: str,
-               labels: List,
-               baseProvider: BaseProvider,
-               outDir: str = './log_pdep2deeph',
-               ):
+def deeph2tcddrf(hamiltonian_path: str,
+                 outDir: str = './log_deeph2tcddrf',
+                 ):
     assert os.path.exists(hamiltonian_path), f"{hamiltonian_path} does not exist"
-    site_norbits_dict, orbital_types_dict, element = label2orbital(labels, save=False)
-    site_norbits = write_sys_info(baseProvider, site_norbits_dict, save=False)
+    folder = pathlib.Path(os.path.abspath(hamiltonian_path)).parent
+    element_fname = os.path.join(folder, "element.dat")
+    orbital_types_fname = os.path.join(folder, "orbital_types.dat")
+    assert os.path.exists(element_fname), f"{element_fname} does not exist"
+    assert os.path.exists(orbital_types_fname), f"{orbital_types_fname} does not exist"
+
+    element = np.loadtxt(element_fname, dtype=int)
+    site_norbits_dict = {}
+    orbital_types_dict = {}
+    with open(orbital_types_fname, 'r') as f:
+        for idx, line in enumerate(f):
+            if element[idx] not in orbital_types_dict:
+                ls = [int(num) for num in line.split()]
+                orbital_types_dict[element[idx]] = ls
+                for l in ls:
+                    site_norbits_dict[element[idx]] = site_norbits_dict.get(element[idx], 0) + 2 * l + 1
+    site_norbits = []
+    for atom in element:
+        site_norbits.append(site_norbits_dict[atom])
+
     hamiltonian_mat = restore_matrix(hamiltonian_path, element, site_norbits, orbital_types_dict)
     if not os.path.exists(outDir):
         os.makedirs(outDir)

@@ -1,7 +1,7 @@
 import os
 import shutil
 import unittest
-from qcat.io_kernel.deeph.deeph_interface import label2orbital, pdep2deeph, deeph2pdep
+from qcat.io_kernel.deeph.deeph_interface import label2orbital, tcddrf2deeph, deeph2tcddrf
 
 class abacusIOUnitTest(unittest.TestCase):
     def test_label2orbital(self):
@@ -37,9 +37,9 @@ class abacusIOUnitTest(unittest.TestCase):
         s_mat = np.asarray(cell.pbc_intor('int1e_ovlp_sph'))
         provider = PYSCFProvider(cell)
         outDir = './log'
-        pdep2deeph(s_mat=s_mat, labels=cell.spheric_labels(), baseProvider=provider, outDir=outDir)
+        tcddrf2deeph(s_mat=s_mat, labels=cell.spheric_labels(), baseProvider=provider, outDir=outDir)
         fname = os.path.join(outDir, "overlaps.h5")
-        s_mat_restore = deeph2pdep(hamiltonian_path=fname, labels=cell.spheric_labels(), baseProvider=provider, outDir=outDir)
+        s_mat_restore = deeph2tcddrf(hamiltonian_path=fname, outDir=outDir)
         shutil.rmtree(outDir)
         self.assertTrue(np.allclose(s_mat, s_mat_restore))
 

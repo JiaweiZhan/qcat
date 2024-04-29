@@ -11,7 +11,7 @@ except ImportError:
 import torch
 import os
 
-__version__ = "1.0.0"
+__version__ = "1.5.0"
 
 def set_nthread():
     if USE_GPU:
