@@ -132,11 +132,12 @@ class PDEP2AO(object):
 
     def run(self,
             workdir: str='./log',
-            prefix: str='westpy',
             pyscf_overlap: bool=False,
             qaq_threshold=None,
             precision: str='float',
             tol: float=1e-1,
+            prefix: str='westpy',
+            save_pdep: bool = False,
             **kwargs,
             ):
         start_time = time.time()
@@ -183,7 +184,8 @@ class PDEP2AO(object):
 
         pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(S, QAQ, basis_g, tol, npdep)
 
-        self.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
+        if save_pdep:
+            self.qe.write_wstat(pdep_eigval_fit, pdep_eigvec_fit, prefix=prefix, eig_mat='chi_0')
         logger.info(f"Running Time: {time.time() - start_time:^8.2f}s")
         return pdep_eigval_fit, pdep_eigvec_fit
 

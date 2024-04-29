@@ -8,7 +8,14 @@ from mpi4py import MPI
 import time
 import pathlib
 import shutil
+import pathlib
+from ase.io import espresso
+from loguru import logger
+
 from qcat.io_kernel.base.base_io import Read
+from qcat.utils import setLogger
+
+setLogger()
 
 class QERead(Read):
 
@@ -407,6 +414,58 @@ class QERead(Read):
         if self.comm:
             self.comm.Barrier()
 
+def perturb_struct(initial_pwfname: str,
+                   out_fname = None,
+                   sigma: float=0.2,
+                   ):
+    assert os.path.exists(initial_pwfname), f"initial_pwfname {initial_pwfname} does not exist"
+    if out_fname is None:
+        out_fname = os.path.join(pathlib.Path(initial_pwfname).parent, 'perturb_' + pathlib.Path(initial_pwfname).name)
+    atoms = espresso.read_espresso_in(initial_pwfname)
+    atom_positions = np.array(atoms.get_positions()) # in angstrom
+    atom_positions += np.random.normal(0, sigma, atom_positions.shape)
+    with open(initial_pwfname, 'r') as f:
+        lines = f.readlines()
+
+    logger.info(f"perturbed structure saved to {out_fname}")
+    with open(out_fname, 'w') as f:
+        idx = 0
+        while idx < len(lines):
+            line = lines[idx]
+            if 'ATOMIC_POSITIONS' in line:
+                line = 'ATOMIC_POSITIONS angstrom\n'
+                f.write(line)
+                idx += 1
+                for i, atom in enumerate(atoms.get_chemical_symbols()):
+                    f.write(f"{atom:^10} {atom_positions[i, 0]:^14.8f} {atom_positions[i, 1]:^14.8f} {atom_positions[i, 2]:^14.8f}\n")
+                    idx += 1
+            else:
+                f.write(line)
+                idx += 1
+
+def createPDEPData(pw_fname: str,
+                   wstat_fname: str,
+                   wfreq_fname: str,
+                   data_dir: str = "./Data",
+                   ndata: int = 20,
+                   sigma: float = 0.2,
+                   seed: int = 0,
+                   ):
+    np.random.seed(seed + 2024)
+    assert os.path.exists(pw_fname), f"pw_fname {pw_fname} does not exist"
+    assert os.path.exists(wstat_fname), f"wstat_fname {wstat_fname} does not exist"
+    assert os.path.exists(wfreq_fname), f"wfreq_fname {wfreq_fname} does not exist"
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    for i in range(ndata):
+        folder_name = os.path.join(data_dir, f"{i+1}")
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        perturb_struct(pw_fname, os.path.join(folder_name, 'pw.in'), sigma)
+        shutil.copy(wstat_fname, os.path.join(folder_name, 'wstat.in'))
+        shutil.copy(wfreq_fname, os.path.join(folder_name, 'wfreq.in'))
+
+
 if __name__ == "__main__":
     # test
     st = time.time()
@@ -424,3 +483,5 @@ if __name__ == "__main__":
     comm.Barrier()
     if rank == 0:
         print('Execution time:', elapsed_time, 'seconds')
+    initial_pwfname = "./pw.in"
+    perturb_struct(initial_pwfname)
