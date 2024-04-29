@@ -416,7 +416,7 @@ class QERead(Read):
 
 def perturb_struct(initial_pwfname: str,
                    out_fname = None,
-                   sigma: float=0.2,
+                   sigma: float=0.1,
                    ):
     assert os.path.exists(initial_pwfname), f"initial_pwfname {initial_pwfname} does not exist"
     if out_fname is None:
