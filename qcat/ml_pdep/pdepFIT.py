@@ -137,7 +137,7 @@ class PDEP2AO(object):
             precision: str='float',
             tol: float=1e-1,
             prefix: str='westpy',
-            save_pdep: bool = False,
+            save_pdep: bool = True,
             **kwargs,
             ):
         start_time = time.time()
