@@ -3,6 +3,7 @@ from typing import List
 import re
 from loguru import logger
 import torch
+import scipy
 
 from qcat.utils import setLogger
 
@@ -91,3 +92,35 @@ def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
     if first_zero:
         Q = np.pad(Q, ((1, 0), (0, 0)), mode='constant', constant_values=0.0)
     return eigs, Q
+
+def reduce_noise_SVD(qaq: np.ndarray,
+                     ):
+    logger.info("Reduce noise by SVD...")
+    with torch.no_grad():
+        qaq = torch.from_numpy(qaq)
+        U, S, Vh = torch.linalg.svd(qaq)
+        nS = S.numel()
+        mask = torch.ones_like(S, dtype=int)
+        # use binary search to find the threshold, dependent on whether there is positive eigenvalues
+        left, right = 0, nS - 1
+        while left <= right:
+            mid = (left + right) // 2
+            mask_copy = mask.clone()
+            mask_copy[mid:] = 0
+            qaq_denoise = U @ torch.diag(S * mask_copy) @ Vh
+            eigvals, _ = torch.linalg.eigh(qaq_denoise)
+            if torch.any(eigvals > 1.e-4):
+                right = mid - 1
+            else:
+                left = mid + 1
+        if left == 0:
+            logger.warning("No negative eigenvalues found.")
+        mid = max(left, 1)
+        mask_copy = mask.clone()
+        mask_copy[mid:] = 0
+        qaq_denoise = U @ torch.diag(S * mask_copy) @ Vh
+        mask_copy[-1] = 1
+        nonzeros = torch.sum(mask_copy).item()
+        logger.info(f"nonzeros: {nonzeros} / {nS}")
+    return qaq_denoise.numpy(), mask_copy.numpy().astype(bool)
+

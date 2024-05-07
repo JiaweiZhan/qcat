@@ -1,7 +1,6 @@
 import datetime
 from matplotlib import pyplot as plt
 import numpy as np
-from scipy.signal import savgol_filter
 from mpi4py import MPI
 import pickle
 from tqdm import tqdm

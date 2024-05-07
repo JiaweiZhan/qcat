@@ -20,3 +20,4 @@ example/.ipynb_checkpoints/*
 **/Dataset_epsilon/**
 **/Dataset_rho/**
 **/*.npy
+kernel.c*

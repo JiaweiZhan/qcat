@@ -47,9 +47,10 @@ class PDEP2AO(object):
     @staticmethod
     def decom2Eigen(spec_val: np.ndarray, # [npdep]
                     spec_vec: np.ndarray, # [npdep, nmill],
+                    k = None,
                     tol: float=1e-10,
                     ):
-        chi_eigval, chi_eigvec = oeigh(spec_vec.T, spec_val, tol=tol) # [nmill, npdep]
+        chi_eigval, chi_eigvec = oeigh(spec_vec.T, spec_val, tol=tol, k=k) # [nmill, npdep]
         return chi_eigval, chi_eigvec.T # [npdep, nmill]
 
 
@@ -100,15 +101,27 @@ class PDEP2AO(object):
         twoOrbitalMat = basis_g.conj() @ eigvec.T
         return (twoOrbitalMat.real * 2) @ np.diag(eigval) @ ((twoOrbitalMat.T.conj()).real * 2)
 
-
     def compute_pdep(self,
                      s: np.ndarray,
                      qaq : np.ndarray,
                      basis_g: np.ndarray,
+                     k = None,
                      tol: float=1e-1,
                      npdep=None,
+                     noise_reduction: bool=False,
                      ):
+        mask_npdep = np.ones(qaq.shape[0]).astype(bool)
+        if npdep is not None:
+            mask_npdep[npdep:] = False
+        if noise_reduction:
+            qaq, mask_svd = reduce_noise_SVD(qaq)
+            mask_npdep = np.logical_and(mask_npdep, mask_svd)
         chi_eigval_fit, coeff = eigh(qaq, s)
+        chi_eigval_fit = chi_eigval_fit[mask_npdep]
+        coeff = coeff[:, mask_npdep]
+        if np.any(chi_eigval_fit > 0):
+            logger.warning(f"Some eigenvalues of QAQ are positive. Reduce npdep from {npdep}.")
+            logger.warning(f"Positive count:{np.sum(chi_eigval_fit > 0)}")
         chi_eigvec_fit = coeff.T @ basis_g # [nbasis, nmill]
         chibar_decom_eigval_fit = chi_eigval_fit
         chibar_decom_eigvec_fit = np.divide(chi_eigvec_fit,
@@ -119,21 +132,39 @@ class PDEP2AO(object):
         chibar_eigval_fit, chibar_eigvec_fit = self.decom2Eigen(chibar_decom_eigval_fit,
                                                                 chibar_decom_eigvec_fit,
                                                                 tol=tol,
+                                                                k = k,
                                                                 ) # [nbasis], [nbasis, nmill]
         chi0bar_eigval_fit = chibar_eigval_fit / (1 + chibar_eigval_fit)
 
         # chibar and chi0bar share same eigenvectors
-        if npdep is None:
-            npdep = chi0bar_eigval_fit.size
-        chi0bar_eigval_fit = chi0bar_eigval_fit[:npdep]
-        chibar_eigvec_fit = chibar_eigvec_fit[:npdep]
+        chi0bar_eigval_fit = chi0bar_eigval_fit
+        chibar_eigvec_fit = chibar_eigvec_fit
         return chi0bar_eigval_fit, chibar_eigvec_fit
+
+    @staticmethod
+    def single_atom_mask(labels: List):
+        mat_dim = len(labels)
+        mask = np.zeros((mat_dim, mat_dim), dtype=int)
+        idx_atom_start = 0
+        idx_atom_end = 1
+        for i in range(mat_dim):
+            if i > 0 and int(labels[i].split()[0]) != int(labels[i - 1].split()[0]):
+                # different atom start
+                mask[idx_atom_start: idx_atom_end, idx_atom_start: idx_atom_end] = 1
+                idx_atom_start = i
+                idx_atom_end = i + 1
+            else:
+                idx_atom_end = i + 1
+        # final atom
+        mask[idx_atom_start: idx_atom_end, idx_atom_start: idx_atom_end] = 1
+        return mask
 
 
     def run(self,
             outDir: str='./log',
             pyscf_overlap: bool=False,
             qaq_threshold=None,
+            off_diagonal=True,
             precision: str='float',
             tol: float=1e-1,
             prefix: str='westpy',
@@ -162,6 +193,12 @@ class PDEP2AO(object):
 
         QAQ = self.compute_QAQ(basis_g, chi_decom_eigvec, chi_decom_eigval) # [nbasis, nbasis]
 
+        if not off_diagonal:
+            single_atom_mask = self.single_atom_mask(labels)
+        else:
+            single_atom_mask = np.ones_like(QAQ, dtype=int)
+        QAQ = QAQ * single_atom_mask
+
         if qaq_threshold:
             logger.info(f"Apply threshold {qaq_threshold:^5.2e} to QAQ matrix.")
             qaq_threshold = np.abs(qaq_threshold)
@@ -182,7 +219,8 @@ class PDEP2AO(object):
         np.save(qaq_fname, QAQ)
         logger.info(f"QAQ matrix is saved in {qaq_fname}")
 
-        pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(S, QAQ, basis_g, tol, npdep)
+        pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(s=S, qaq=QAQ, basis_g=basis_g,
+                                                             tol=tol, npdep=npdep)
 
         if save_pdep:
             prefix = os.path.join(outDir, prefix)
@@ -193,19 +231,29 @@ class PDEP2AO(object):
 def tcddrf2PDEP(wfc_name: str,
                 qaq: np.ndarray,
                 s: np.ndarray,
-                npdep: int,
+                precision: str='float',
                 basis: str = "cc-pvqz",
                 unit: str = "B",
                 exp_to_discard = 0.1,
+                noise_reduction: bool=False,
+                npdep = None,
+                k = None,
                 tol: float=1e-1,
                 outDir: str='./log_tcddrf2PDEP',
                 prefix: str='tcddrf2PDEP',
                 **kwargs):
     start_time = time.time()
+    possible_precision = ['float', 'double']
+    assert precision in possible_precision, f"precision should be one of {possible_precision}"
     pdep2ao = PDEP2AO(wfc_name, basis=basis, unit=unit, exp_to_discard=exp_to_discard)
     basis_g, _, _, _ = pdep2ao.getAO_G(**kwargs)
     
-    pdep_eigval_fit, pdep_eigvec_fit = pdep2ao.compute_pdep(s, qaq, basis_g, tol, npdep)
+    if precision == 'float':
+        s = s.astype(np.float32)
+        qaq = qaq.astype(np.float32)
+        basis_g = basis_g.astype(np.complex64)
+    pdep_eigval_fit, pdep_eigvec_fit = pdep2ao.compute_pdep(s=s, qaq=qaq, basis_g=basis_g,
+                                                            noise_reduction=noise_reduction, tol=tol, npdep=npdep, k=k)
     if not os.path.exists(outDir):
         os.makedirs(outDir)
     prefix = os.path.join(outDir, prefix)

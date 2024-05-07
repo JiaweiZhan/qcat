@@ -69,8 +69,8 @@ def parse_matrix(matrix_path, element,
                         key_str = f"[{R_cur[0]}, {R_cur[1]}, {R_cur[2]}, {index_site_i + 1}, {index_site_j + 1}]"
                         mat = hamiltonian_cur[(site_norbits_cumsum[index_site_i] - site_norbits[index_site_i]):site_norbits_cumsum[index_site_i],
                                             (site_norbits_cumsum[index_site_j] - site_norbits[index_site_j]): site_norbits_cumsum[index_site_j]]
-                        if abs(mat).max() < 1e-8:
-                            continue
+                        # if abs(mat).max() < 1e-8:
+                        #     continue
                         mat = U_orbital.transform(mat, orbital_types_dict[element[index_site_i]],
                                                     orbital_types_dict[element[index_site_j]])
                         matrix_dict[key_str] = mat
