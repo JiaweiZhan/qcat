@@ -2,13 +2,17 @@
 
 from setuptools import find_packages
 from distutils.core import setup
+import subprocess
+import sys
+
+args = [sys.executable, "./setup_ext.py"]
+subprocess.check_call(args)
 
 setup(
-    name='abinitioToolKit',
+    name='qcat',
     version='1.6.0',
-    packages=['abinitioToolKit',
+    packages=['qcat',
               ],
-    # find_packages(exclude=[]),
     install_requires=[
         "h5py",
         "lxml",
@@ -21,6 +25,7 @@ setup(
         "PyYAML",
         "pyscf",
         "e3nn",
+        "Cython",
         ],
     include_package_data=True,
 )

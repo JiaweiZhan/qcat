@@ -89,6 +89,10 @@ optional arguments:
 
 ## Requirements
 version of Quantum Espresso >= 5.4
+## Installation
+```bash
+pip uninstall qcat
+```
 
 ## TODO
 

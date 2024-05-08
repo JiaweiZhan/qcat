@@ -1,7 +1,16 @@
 from setuptools import setup, Extension
-from Cython.Build import cythonize
+import sys, subprocess
+import pkg_resources
+
+try:
+    pkg_resources.require("Cython")
+    from Cython.Build import cythonize
+except pkg_resources.DistributionNotFound:
+    print("Cython not found. Installing Cython...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Cython"])
+    from Cython.Build import cythonize
+
 import numpy
-import sys
 
 # Define the extension module with the correct path
 extensions = [
