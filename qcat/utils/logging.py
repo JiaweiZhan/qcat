@@ -8,9 +8,17 @@ def setLogger(
     logfile=None,
     rotation='10 MB',
     retention='30 days',
-    compression='zip'
+    compression='zip',
+    filter_out=None,
     ):
     logger.remove()  # Remove default handler
+
+    def filter_out_module(record):
+        # Exclude all logs from 'qcat.assignGrid.assignGrid'
+        if filter_out and filter_out in record["name"]:
+            return False
+        else:
+            return True
 
     if logfile:
         logger.add(
@@ -19,12 +27,14 @@ def setLogger(
             format=format,
             rotation=rotation,
             retention=retention,
-            compression=compression
+            compression=compression,
+            filter_out=filter_out_module,
         )
 
     # Add a stream handler
     logger.add(
         stream,
         level=level,
-        format=format
+        format=format,
+        filter=filter_out_module,
     )

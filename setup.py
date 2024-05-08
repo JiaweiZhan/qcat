@@ -5,7 +5,7 @@ from distutils.core import setup
 
 setup(
     name='abinitioToolKit',
-    version='1.5.0',
+    version='1.6.0',
     packages=['abinitioToolKit',
               ],
     # find_packages(exclude=[]),
