@@ -5,9 +5,9 @@ import pandas as pd
 
 from qcat.io_kernel import QBOXRead
 from qcat.utils import setLogger
-from qcat.assignGrid import assignGrid
+from qcat.atomicEnv import atomicBox
 
-setLogger(filter_out="qcat.assignGrid.assignGrid")
+setLogger(filter_out="qcat.atomicEnv.atomicBox")
 threshold = 1.2
 
 def default_rcut(atom_pos: np.ndarray, # atom pos in cartesian coordinate
@@ -56,8 +56,8 @@ def mag_moment_per_site(qbox_folder: str,
         atom_name = atompos[idx][0]
         atoms_pos_frac = atom_pos[None, :] @ np.linalg.inv(cell)
         atom_pos_frac = atoms_pos_frac % 1
-        ag = assignGrid(cell, fftw, atom_pos, rcut)
-        idx = ag.compute_idx() # [ngrid_near, 3]
+        ab = atomicBox(cell, fftw, atom_pos, rcut)
+        idx = ab.compute_idx() # [ngrid_near, 3]
         frac_coords = np.mod(idx / fftw[None, :], 1)
         l, m, n = idx.T
         dist = (frac_coords - atom_pos_frac + 0.5) % 1 - 0.5
