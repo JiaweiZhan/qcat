@@ -21,6 +21,10 @@ To update the package, please run:
 ```bash
 pip install qcat --upgrade
 ```
+To uninstall the package, please run:
+```bash
+pip uninstall qcat
+```
 ## Documentation
 * `class_ldos.py` has the main class for computing local band edge (local CBM and VBM)
 * `qe_io.py` is a general I/O class to parse Quantum Espresso's binary output
@@ -89,10 +93,6 @@ optional arguments:
 
 ## Requirements
 version of Quantum Espresso >= 5.4
-## Installation
-```bash
-pip uninstall qcat
-```
 
 ## TODO
 
