@@ -2,7 +2,7 @@ import numpy as np
 cimport numpy as np
 import math
 
-def generate_mnl(np.ndarray[np.float64_t, ndim=2] alpha, double adjust_rcut):
+def obtainBox(np.ndarray[np.float64_t, ndim=2] alpha, double adjust_rcut):
     cdef int l_min, l_max, n_min, n_max, m_min, m_max
     cdef int l, n, m
     cdef double l_core, n_core_p, n_core_n, m_core_p, m_core_n

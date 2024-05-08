@@ -1,5 +1,5 @@
 import numpy as np
-from .kernel import generate_mnl
+from .kernel import obtainBox
 from typing import Tuple
 import time
 from qcat.utils import setLogger
@@ -7,7 +7,7 @@ from loguru import logger
 
 setLogger()
 
-class assignGrid(object):
+class atomicBox(object):
     def __init__(self,
                  cell: np.ndarray,
                  fftw: Tuple[int, int, int],
@@ -55,7 +55,7 @@ class assignGrid(object):
 
         logger.info(f"start generate_mnl: {time.time() - start:.3f}s")
 
-        mnl = generate_mnl(alpha, self.adjust_rcut_)
+        mnl = obtainBox(alpha, self.adjust_rcut_)
 
         logger.info(f"end generate_mnl: {time.time() - start:.3f}s")
 
