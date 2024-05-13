@@ -163,7 +163,7 @@ def tcddrf2deeph(
     baseProvider: BaseProvider,
     outDir: str = "./log_tcddrf2deeph",
     chi_mat=None,
-    factor: float = 1.0e2,
+    factor: float = 1.0e3,
 ):
     if not os.path.exists(outDir):
         os.makedirs(outDir)
@@ -209,7 +209,7 @@ def tcddrf2deeph(
 def deeph2tcddrf(
     hamiltonian_path: str,
     outDir: str = "./log_deeph2tcddrf",
-    factor: float = 1.0e-2,
+    factor: float = 1.0e-3,
 ):
     assert os.path.exists(hamiltonian_path), f"{hamiltonian_path} does not exist"
     folder = pathlib.Path(os.path.abspath(hamiltonian_path)).parent
