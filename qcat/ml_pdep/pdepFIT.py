@@ -252,10 +252,6 @@ class PDEP2AO(object):
         np.save(qaq_fname, QAQ)
         logger.info(f"QAQ matrix is saved in {qaq_fname}")
 
-        pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(
-            s=S, qaq=QAQ, basis_g=basis_g, tol=tol, npdep=npdep
-        )
-
         if compute_pdep:
             pdep_eigval_fit, pdep_eigvec_fit = self.compute_pdep(
                 s=S, qaq=QAQ, basis_g=basis_g, tol=tol, npdep=npdep
