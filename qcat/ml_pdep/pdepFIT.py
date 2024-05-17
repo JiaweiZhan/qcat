@@ -169,29 +169,46 @@ class PDEP2AO(object):
         return chi0bar_eigval_fit, chibar_eigvec_fit
 
     @staticmethod
-    def single_atom_mask(labels: List):
+    def atomIdx(labels: np.ndarray):
         mat_dim = len(labels)
-        mask = np.zeros((mat_dim, mat_dim), dtype=int)
-        idx_atom_start = 0
-        idx_atom_end = 1
+        atomIdx = []
+        atom_start = 0
         for i in range(mat_dim):
             if i > 0 and int(labels[i].split()[0]) != int(labels[i - 1].split()[0]):
                 # different atom start
-                mask[idx_atom_start:idx_atom_end, idx_atom_start:idx_atom_end] = 1
-                idx_atom_start = i
-                idx_atom_end = i + 1
-            else:
-                idx_atom_end = i + 1
+                atomIdx.append((atom_start, i))
+                atom_start = i
         # final atom
-        mask[idx_atom_start:idx_atom_end, idx_atom_start:idx_atom_end] = 1
-        return mask
+        atomIdx.append((atom_start, mat_dim))
+        return atomIdx
+
+    @staticmethod
+    def one_center_DDRF(
+        QAQ: np.ndarray,
+        S: np.ndarray,
+        atomIdx: List,
+    ):
+        eigval, coeff = eigh(QAQ, S)
+        sigma_tilde = coeff @ np.diag(eigval) @ coeff.T
+        qaq_1cddrf = np.zeros_like(QAQ)
+        for atom_start, atom_end in atomIdx:
+            weight = np.zeros_like(sigma_tilde)
+            weight[atom_start:atom_end] = 0.5
+            weight[:, atom_start:atom_end] = 0.5
+            weight[atom_start:atom_end, atom_start:atom_end] = 1.0
+            sigma_tilde_i = sigma_tilde * weight
+            si_bar = S[atom_start:atom_end]
+            si_inv = np.linalg.inv(S[atom_start:atom_end, atom_start:atom_end])
+            lhs = si_bar.T @ si_inv @ si_bar
+            qaq_1cddrf += lhs @ sigma_tilde_i @ lhs
+        return qaq_1cddrf
 
     def run(
         self,
         outDir: str = "./log",
         pyscf_overlap: bool = False,
         qaq_threshold=None,
-        off_diagonal=True,
+        method: str = "2c",
         precision: str = "float",
         tol: float = 1e-1,
         prefix: str = "westpy",
@@ -204,6 +221,10 @@ class PDEP2AO(object):
         assert (
             precision in possible_precision
         ), f"precision should be one of {possible_precision}"
+
+        possible_method = ["2c", "1c"]
+        assert method in possible_method, f"method should be one of {possible_method}"
+
         if not os.path.exists(outDir):
             os.makedirs(outDir)
         chi_decom_eigval, chi_decom_eigvec = (
@@ -226,11 +247,10 @@ class PDEP2AO(object):
             basis_g, chi_decom_eigvec, chi_decom_eigval
         )  # [nbasis, nbasis]
 
-        if not off_diagonal:
-            single_atom_mask = self.single_atom_mask(labels)
-        else:
-            single_atom_mask = np.ones_like(QAQ, dtype=int)
-        QAQ = QAQ * single_atom_mask
+        if method == "1c":
+            atomIdx = self.atomIdx(labels)
+            assert len(atomIdx) == self.pyscf_obj.cell.natm
+            QAQ = self.one_center_DDRF(QAQ, S, atomIdx)
 
         if qaq_threshold:
             logger.info(f"Apply threshold {qaq_threshold:^5.2e} to QAQ matrix.")
