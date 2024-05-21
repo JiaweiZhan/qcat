@@ -191,8 +191,9 @@ class PDEP2AO(object):
         eigval, coeff = eigh(QAQ, S)
         sigma_tilde = coeff @ np.diag(eigval) @ coeff.T
         qaq_1cddrf = np.zeros_like(QAQ)
+        weight = np.zeros_like(sigma_tilde)
         for atom_start, atom_end in atomIdx:
-            weight = np.zeros_like(sigma_tilde)
+            weight[:, :] = 0.0
             weight[atom_start:atom_end] = 0.5
             weight[:, atom_start:atom_end] = 0.5
             weight[atom_start:atom_end, atom_start:atom_end] = 1.0
@@ -209,8 +210,8 @@ class PDEP2AO(object):
         pyscf_overlap: bool = False,
         qaq_threshold=None,
         method: str = "2c",
-        precision: str = "float",
-        tol: float = 1e-1,
+        precision: str = "double",
+        tol: float = 1e-10,
         prefix: str = "westpy",
         compute_pdep: bool = True,
         **kwargs,
@@ -290,14 +291,14 @@ def tcddrf2PDEP(
     wfc_name: str,
     qaq: np.ndarray,
     s: np.ndarray,
-    precision: str = "float",
+    precision: str = "double",
     basis: str = "cc-pvqz",
     unit: str = "B",
     exp_to_discard=0.1,
     noise_reduction: bool = False,
     npdep=None,
     k=None,
-    tol: float = 1e-1,
+    tol: float = 1e-10,
     outDir: str = "./log_tcddrf2PDEP",
     prefix: str = "tcddrf2PDEP",
     **kwargs,
