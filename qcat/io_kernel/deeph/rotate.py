@@ -91,6 +91,7 @@ class Rotate:
             1: torch.eye(3, dtype=torch_dtype)[[1, 2, 0]].to(device=device),
             2: torch.eye(5, dtype=torch_dtype)[[2, 4, 0, 3, 1]].to(device=device),
             3: torch.eye(7, dtype=torch_dtype)[[6, 4, 2, 0, 1, 3, 5]].to(device=device),
+            4: torch.eye(9, dtype=torch_dtype)[[8, 6, 4, 2, 0, 1, 3, 5, 7]].to(device=device),
         }
         self.Us_wiki2openmx = {k: v.T for k, v in self.Us_openmx2wiki.items()}
 

@@ -64,9 +64,12 @@ class PDEP2AO(object):
         cutoff=None,
         use_lcao: bool = False,
         lcao_fname=None,
-        remove_shls: List = ["s", "g", "h", "i", "j"],
+        remove_g: bool = True,
         eval_overlap_r: bool = False,
     ):
+        remove_shls = ["s", "h", "i", "j"]
+        if remove_g:
+            remove_shls.append("g")
         basis_cpu = self.pyscf_obj.get_basis(
             shls_slice, cutoff, use_lcao, lcao_fname
         )  # (nAO, nx, ny, nz)

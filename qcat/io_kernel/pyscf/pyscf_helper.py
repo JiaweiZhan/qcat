@@ -12,24 +12,26 @@ class pyscfHelper:
                  basis: str = "aug-cc-pvqz",
                  unit: str = "B",
                  exp_to_discard = None,
+                 nimgs = None,
                  ):
         self.dft_provider_ = dft_provider
         self.pyscf_cell_ = pbc.gto.Cell()
         self.basis_wrapper = None
         self.use_pyscf_basis = True
-        self.build_cell(basis, unit, exp_to_discard)
+        self.build_cell(basis, unit, exp_to_discard, nimgs)
 
     def build_cell(self,
                    basis: str = "aug-cc-pvqz",
                    unit: str = "B",
                    exp_to_discard = None,
+                   nimgs = None,
                    ):
         self.pyscf_cell_.atom = self.dft_provider_.atom
         self.pyscf_cell_.a = self.dft_provider_.cell
         self.pyscf_cell_.unit = unit
         self.pyscf_cell_.basis = basis
         self.pyscf_cell_.exp_to_discard = exp_to_discard
-        self.pyscf_cell_.build()
+        self.pyscf_cell_.build(nimgs=nimgs)
 
     def get_basis(self,
                   shls_slice=None,

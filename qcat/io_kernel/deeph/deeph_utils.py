@@ -14,8 +14,8 @@ class OrbA2B(object):
         self.Us_a2b = Us_a2b
 
     def get_U(self, l):
-        if l > 3:
-            raise NotImplementedError("Only support l = s, p, d, f")
+        if l > 4:
+            raise NotImplementedError("Only support l = s, p, d, f, g")
         return self.Us_a2b[l]
 
     def transform(self, mat, l_lefts, l_rights):
@@ -31,6 +31,7 @@ class OrbPYSCF2OpenMX(OrbA2B):
         Us_pyscf2openmx[1] = np.eye(3)[[0, 1, 2]]
         Us_pyscf2openmx[2] = np.eye(5)[[2, 4, 0, 3, 1]]
         Us_pyscf2openmx[3] = np.eye(7)[[3, 4, 2, 5, 1, 6, 0]]
+        Us_pyscf2openmx[4] = np.eye(9)[[4, 5, 3, 6, 2, 7, 1, 8, 0]]
         super().__init__(Us_pyscf2openmx)
 
 
@@ -41,6 +42,7 @@ class OrbOpenMX2PYSCF(OrbA2B):
         Us_openmx2pyscf[1] = np.eye(3)[[0, 1, 2]]
         Us_openmx2pyscf[2] = np.eye(5)[[2, 4, 0, 3, 1]]
         Us_openmx2pyscf[3] = np.eye(7)[[6, 4, 2, 0, 1, 3, 5]]
+        Us_openmx2pyscf[4] = np.eye(9)[[8, 6, 4, 2, 0, 1, 3, 5, 7]]
         super().__init__(Us_openmx2pyscf)
 
 

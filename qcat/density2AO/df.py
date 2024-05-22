@@ -17,11 +17,13 @@ class DF:
                  roll: bool = True,
                  exp_to_discard = None,
                  debug: bool = False,
+                 nimgs = None,
                  ):
         self.filename_ = filename
         self.density_ = CubeProvider(filename, roll)
         self.pyscf_wrapper = pyscfHelper(self.density_, basis=basis,
-                                         unit=unit, exp_to_discard=exp_to_discard)
+                                         unit=unit, exp_to_discard=exp_to_discard,
+                                         nimgs=nimgs)
         self.coeff_ = np.empty(0)
         self.f_density_ = np.empty(0)
         if debug:

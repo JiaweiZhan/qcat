@@ -18,7 +18,7 @@ from qcat.io_kernel.deeph.rotate import get_rh
 
 setLogger()
 
-str2l = {"s": 0, "p": 1, "d": 2, "f": 3}
+str2l = {"s": 0, "p": 1, "d": 2, "f": 3, "g": 4}
 
 
 def write_R_sparse(

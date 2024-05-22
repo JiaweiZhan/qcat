@@ -29,19 +29,20 @@ class abacusIOUnitTest(unittest.TestCase):
         from qcat.io_kernel import PYSCFProvider
         import numpy as np
         cell = gto.Cell()
-        cell.atom = '''H  0 0 0; H 1 1 1; O 0 1 0'''
-        cell.basis = 'cc-pvtz'
+        cell.atom = '''H  0 0 0; H 1 1 1; Si 0 1 0'''
+        cell.basis = 'aug-cc-pvqz'
         cell.a = np.eye(3) * 2
         cell.build()
+        factor = 1000
 
         s_mat = np.asarray(cell.pbc_intor('int1e_ovlp_sph'))
         provider = PYSCFProvider(cell)
         outDir = './log'
-        tcddrf2deeph(s_mat=s_mat, labels=cell.spheric_labels(), baseProvider=provider, outDir=outDir)
+        tcddrf2deeph(s_mat=s_mat, labels=cell.spheric_labels(), baseProvider=provider, outDir=outDir, factor=factor)
         fname = os.path.join(outDir, "overlaps.h5")
-        s_mat_restore = deeph2tcddrf(hamiltonian_path=fname, outDir=outDir)
+        s_mat_restore = deeph2tcddrf(hamiltonian_path=fname, outDir=outDir, factor=1.0/factor)
         shutil.rmtree(outDir)
-        self.assertTrue(np.allclose(s_mat, s_mat_restore))
+        self.assertTrue(np.allclose(s_mat, s_mat_restore * factor))
 
 if __name__ == '__main__':
     unittest.main()
