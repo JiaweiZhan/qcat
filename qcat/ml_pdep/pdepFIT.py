@@ -107,7 +107,7 @@ class PDEP2AO(object):
 
     def compute_S(
         self,
-        basis_g: np.ndarray,  # [nbasis, nmill]
+        basis_g: torch.Tensor,  # [nbasis, nmill]
         pyscf_overlap: bool = False,
         mask=None,
     ):
@@ -115,13 +115,13 @@ class PDEP2AO(object):
             return (basis_g.conj() @ basis_g.T).real * 2
         else:
             ovm = self.pyscf_obj.cell.pbc_intor("int1e_ovlp_sph")
-            return ovm[mask, :][:, mask]
+            return torch.as_tensor(ovm[mask, :][:, mask])
 
     @staticmethod
     def compute_QAQ(
-        basis_g: np.ndarray,  # [nbasis, nmill]
-        eigvec: np.ndarray,  # [npdep, nmill]
-        eigval: np.ndarray,  # [npdep]
+        basis_g: torch.Tensor,  # [nbasis, nmill]
+        eigvec : torch.Tensor,  # [npdep, nmill]
+        eigval : torch.Tensor,  # [npdep]
     ):
         twoOrbitalMat = basis_g.conj() @ eigvec.T
         return (
@@ -320,7 +320,8 @@ def tcddrf2PDEP(
         precision in possible_precision
     ), f"precision should be one of {possible_precision}"
     pdep2ao = PDEP2AO(wfc_name, basis=basis, unit=unit, exp_to_discard=exp_to_discard)
-    basis_g, _, _, _ = pdep2ao.getAO_G(**kwargs)
+    basis_g, _, _ = pdep2ao.getAO_G(**kwargs)
+    basis_g = basis_g.numpy()
 
     if precision == "float":
         s = s.astype(np.float32)
