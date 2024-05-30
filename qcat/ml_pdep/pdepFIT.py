@@ -65,40 +65,45 @@ class PDEP2AO(object):
         use_lcao: bool = False,
         lcao_fname=None,
         remove_g: bool = True,
-        eval_overlap_r: bool = False,
     ):
+        if shls_slice is None:
+            shls_slice = (0, self.pyscf_obj.cell.nbas)
         remove_shls = ["s", "h", "i", "j"]
         if remove_g:
             remove_shls.append("g")
-        basis_cpu = self.pyscf_obj.get_basis(
-            shls_slice, cutoff, use_lcao, lcao_fname
-        )  # (nAO, nx, ny, nz)
-        basis_cpu, labels, mask = clear_basis(
-            basis_cpu, self.pyscf_obj.spheric_labels, remove_shls
+        labels, mask = clear_basis(
+            self.pyscf_obj.spheric_labels, remove_shls
         )
-        nbasis = basis_cpu.shape[0]
-        logger.info(f"nbasis: {nbasis}")
+        logger.info(f"nbasis: {np.sum(mask)} / {len(mask)}")
 
-        ovm = None
-        if eval_overlap_r:
-            ovm = np.tensordot(basis_cpu, basis_cpu, axes=([1, 2, 3], [1, 2, 3]))
-            norm = np.sqrt(np.diag(ovm))
-            norm_matrix = norm[:, None] @ norm[None, :]
-            ovm /= norm_matrix
-
-        basis_cpu = torch.fft.fftn(
-            torch.as_tensor(basis_cpu, dtype=torch.float32),
-            dim=(1, 2, 3),
-            norm="forward",
-        ).numpy()
-        basis_g = np.zeros(
-            (nbasis, len(self.qe.mill)), dtype=basis_cpu.dtype
-        )  # [nbasis, nmill]
         mill_x, mill_y, mill_z = self.qe.mill.T
-        basis_g[:] = basis_cpu[:, mill_x, mill_y, mill_z]
-        norm_basis_g = np.sqrt(np.diag((basis_g @ basis_g.T.conj()).real) * 2)
+        basis_g = []
+        tot_prog = shls_slice[1] - shls_slice[0]
+        prog_per = -1
+        nstep = 5
+        for i in range(shls_slice[0], shls_slice[1], nstep):
+            shls_slice_l_upper = min(i + nstep, shls_slice[1])
+            shls_slice_l = (i, shls_slice_l_upper)
+            basis_cpu_l = self.pyscf_obj.get_basis(
+                shls_slice_l, cutoff, use_lcao, lcao_fname
+            )  # (nAO, nx, ny, nz)
+
+            basis_cpu_l = torch.fft.fftn(
+                torch.as_tensor(basis_cpu_l, dtype=torch.float64),
+                dim=(1, 2, 3),
+                norm="forward",
+            )
+            basis_g.append(basis_cpu_l[:, mill_x, mill_y, mill_z])
+            cur_prog = shls_slice_l_upper - shls_slice[0]
+            cur_prog_per = int(cur_prog / tot_prog * 5)
+            if cur_prog_per > prog_per:
+                prog_per = cur_prog_per
+                logger.info(f"Progress: {prog_per*20:^3}%")
+        basis_g = torch.vstack(basis_g)
+        basis_g = basis_g[mask]
+        norm_basis_g = torch.sqrt(torch.diag((basis_g @ basis_g.T.conj()).real) * 2)
         basis_g /= norm_basis_g[:, None]  # [nbasis, nmill]
-        return basis_g, labels, mask, ovm
+        return basis_g, labels, mask
 
     def compute_S(
         self,
@@ -121,7 +126,7 @@ class PDEP2AO(object):
         twoOrbitalMat = basis_g.conj() @ eigvec.T
         return (
             (twoOrbitalMat.real * 2)
-            @ np.diag(eigval)
+            @ torch.diag(eigval)
             @ ((twoOrbitalMat.T.conj()).real * 2)
         )
 
@@ -235,21 +240,24 @@ class PDEP2AO(object):
             self.getChiSpecDecomp()
         )  # [npdep], [npdep, nmill]
         npdep = chi_decom_eigval.size
-        basis_g, labels, mask, S = self.getAO_G(**kwargs)  # [nbasis, nmill]
+        basis_g, labels, mask = self.getAO_G(**kwargs)  # [nbasis, nmill]
+        chi_decom_eigval = torch.as_tensor(chi_decom_eigval)
+        chi_decom_eigvec = torch.as_tensor(chi_decom_eigvec)
 
         if precision == "float":
-            basis_g = basis_g.astype(np.complex64)
-            chi_decom_eigvec = chi_decom_eigvec.astype(np.complex64)
-            chi_decom_eigval = chi_decom_eigval.astype(np.float32)
-            if S is not None:
-                S = S.astype(np.float32)
+            basis_g = basis_g.to(torch.complex64)
+            chi_decom_eigvec = chi_decom_eigvec.to(torch.complex64)
+            chi_decom_eigval = chi_decom_eigval.to(torch.float32)
 
-        if S is None:
-            S = self.compute_S(basis_g, pyscf_overlap, mask)  # [nbasis, nbasis]
+        S = self.compute_S(basis_g, pyscf_overlap, mask)  # [nbasis, nbasis]
 
         QAQ = self.compute_QAQ(
             basis_g, chi_decom_eigvec, chi_decom_eigval
         )  # [nbasis, nbasis]
+
+        S = S.numpy()
+        QAQ = QAQ.numpy()
+        basis_g = basis_g.numpy()
 
         if method == "1c":
             atomIdx = self.atomIdx(labels)

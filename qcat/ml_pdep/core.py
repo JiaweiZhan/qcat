@@ -9,8 +9,7 @@ from qcat.utils import setLogger
 
 setLogger()
 
-def clear_basis(basis: np.ndarray, # (nbasis, nx, ny, nz)
-                labels: List[str], # (nbasis,)
+def clear_basis(labels: List[str], # (nbasis,)
                 shls: List=['s', 'g', 'h', 'i', 'j'],
                 ):
     """
@@ -24,7 +23,7 @@ def clear_basis(basis: np.ndarray, # (nbasis, nx, ny, nz)
     mask = ~mask
 
     # Apply mask to basis and labels
-    return basis[mask], np.array(labels)[mask], mask
+    return np.array(labels)[mask], mask
 
 def oeigh(spectrum_phi: np.ndarray, # (ngrid, npdep)
           spectrum_eig: np.ndarray, # (npdep,)
