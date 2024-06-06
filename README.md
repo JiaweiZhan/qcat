@@ -61,18 +61,22 @@ module load intelmpi/2019.up7+intel-19.1.1
     # comm: MPI COMM_WORLD
 
     # choose abinitio software
-    abinitioRead = qbox_io.QBOXRead(comm)
-    # abinitioRead = qe_io.QERead(comm)
+    qe_outFolder = "./si.save"
+    # abinitioRead = qbox_io.QBOXRead(comm)
+    abinitioRead = qe_io.QERead(outFolder=qe_outFolder,
+                                comm=comm)
 
-    storeFolder = './wfc/'
-    localDensityOfState = LDOS(read_obj=abinitioRead, delta=delta, saveFolder=saveFileFolder, comm=comm)
-    localDensityOfState.computeLDOS(storeFolder)
+    localDensityOfState = LDOS(read_obj=abinitioRead,
+                               delta=delta,
+                               comm=comm)
+    localDensityOfState.computeLDOS(axis='z')
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     if rank == 0:
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
+        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, picName='ldos.pdf')
 ```
-see [`example/ldos_example.py`](./example/ldos_example.py) for reference
+see [`example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference
 
 3. Run:
 ```

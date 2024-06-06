@@ -9,19 +9,17 @@ import pickle
 
 class LDOS:
 
-    def __init__(self, read_obj, delta=0.001, saveFolder='./scf.save', comm=None):
+    def __init__(self, read_obj, delta=0.001, comm=None):
         """
         Init LDOS class:
             param:
                 delta: float;
                 numThread: int;
-                saveFolder: str
                 backp: bool
         """
         self.delta = delta
         self.lvbm = None 
         self.lcbm = None 
-        self.saveFolder = saveFolder
         self.storeFolder = './wfc/'
         self.comm = comm
         self.read_obj = read_obj

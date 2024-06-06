@@ -134,10 +134,12 @@ def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
                 file_object.write('\n')
     print(f"\n\nLocal band edge is printed in {fileName}")
 
-def drawLocalBandEdge(lcbm, lvbm, z_length, kernel_size=15, picName='ldos.pdf'):
+def drawLocalBandEdge(lcbm, lvbm, z_length=None, kernel_size=15, picName='ldos.pdf'):
     if kernel_size % 2 == 0:
         kernel_size += 1
     fig, ax = plt.subplots(figsize=(10, 5))
+    if z_length is None:
+        z_length = len(lvbm)
     x_axis = np.linspace(0, z_length, len(lcbm))
     # smooth
     # lvbm_smooth = savgol_filter(lvbm, 11, 3)

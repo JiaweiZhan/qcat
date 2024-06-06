@@ -1,11 +1,10 @@
-#!/scratch/midway2/jiaweiz/anaconda3/bin/python3
 import argparse
 import os
 import signal
 import numpy as np
-from abinitioToolKit.class_ldos import LDOS
-from abinitioToolKit import qe_io, qbox_io
-from abinitioToolKit import utils
+from qcat.pp import LDOS
+from qcat.io_kernel import qe_io, qbox_io
+from qcat.utils import utils
 from mpi4py import MPI
 import time
 from functools import partial
@@ -53,23 +52,19 @@ if __name__ == "__main__":
 
     abinitioRead = None
     if args.abinitio.lower() == "qbox":
-        abinitioRead = qbox_io.QBOXRead(comm)
+        abinitioRead = qbox_io.QBOXRead(args.saveFileFolder, comm)
     elif args.abinitio.lower() == "qe":
-        abinitioRead = qe_io.QERead(comm)
+        abinitioRead = qe_io.QERead(args.saveFileFolder, comm)
 
-    storeFolder = './wfc/'
-    localDensityOfState = LDOS(read_obj=abinitioRead, delta=args.delta, saveFolder=args.saveFileFolder, comm=comm)
-    localDensityOfState.computeLDOS(storeFolder)
+    localDensityOfState = LDOS(read_obj=abinitioRead,
+                               delta=args.delta,
+                               comm=comm)
+    localDensityOfState.computeLDOS(axis='z')
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     if rank == 0:
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
-
-        with open(storeFolder + '/info.pickle', 'rb') as handle:
-            info_data = pickle.load(handle)
-        cell = info_data['cell']
-        z_length = np.linalg.norm(cell[-1])
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=z_length, picName='ldos.pdf')
+        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, picName='ldos.pdf')
 
     # get the execution time
     # get the end time
@@ -77,5 +72,4 @@ if __name__ == "__main__":
     elapsed_time = et - st
     comm.Barrier()
     if rank == 0:
-        shutil.rmtree(storeFolder)
         print('Execution time:', elapsed_time, 'seconds')

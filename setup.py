@@ -1,19 +1,43 @@
 # -*- coding: utf-8 -*-
 
-from setuptools import find_packages
-from distutils.core import setup
-import subprocess
-import sys
+from setuptools import find_packages, setup, Extension
+import sys, subprocess
+import pkg_resources
 
-args = [sys.executable, "./setup_ext.py"]
-subprocess.check_call(args)
+try:
+    pkg_resources.require("Cython")
+    from Cython.Build import cythonize
+except pkg_resources.DistributionNotFound:
+    print("Cython not found. Installing Cython...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Cython"])
+    from Cython.Build import cythonize
+
+try:
+    pkg_resources.require("Numpy")
+    import numpy
+except pkg_resources.DistributionNotFound:
+    print("Numpy not found. Installing Numpy...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
+    import numpy
+
+# Define the extension module with the correct path
+extensions = [
+    Extension(
+        "qcat.atomicEnv.kernel",                            # Module name
+        ["./qcat/atomicEnv/kernel.pyx"],         # Cython source file
+        include_dirs=[numpy.get_include()],  # Include NumPy headers
+        extra_compile_args=['-O3', '-march=native'],
+    )
+]
 
 setup(
     name='qcat',
     version='1.6.0',
-    packages=['qcat',
-              ],
+    ext_modules=cythonize(extensions, language_level="3"),
+    packages=find_packages(),
     install_requires=[
+        "pandas",
+        "loguru",
         "h5py",
         "lxml",
         "matplotlib",
