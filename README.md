@@ -50,6 +50,8 @@ module load intelmpi/2019.up7+intel-19.1.1
 ```
 2. Create a python file to call functions from **qcat**
 ```python
+    # ldos_example.py
+
     from qcat.pp import class_ldos
     from qcat.io_kernel import qe_io, qbox_io
     from qcat.utils import utils
@@ -58,27 +60,38 @@ module load intelmpi/2019.up7+intel-19.1.1
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
 
-    # delta is the parameter to control the location of LCBM/LVBM
-    # saveFileFolder: the location of folder for *.save (QE) or XML sample and qbox.out (QBOX) 
-    # comm: MPI COMM_WORLD
+    # delta     : parameter to control the location of LCBM/LVBM (checkout eq.3 of https://doi.org/10.1063/1.4811481)
+    # outFolder : the location of folder for *.save (QE) or XML sample and qbox.out (QBOX) 
+    # comm      : MPI COMM_WORLD
 
     # choose abinitio software
-    qe_outFolder = "./si.save"
-    # abinitioRead = qbox_io.QBOXRead(comm)
-    abinitioRead = qe_io.QERead(outFolder=qe_outFolder,
-                                comm=comm)
+    outFolder = "./si.save"
 
+    # initialize reader instance
+    # abinitioRead = qbox_io.QBOXRead(outFolder=outFolder, comm=comm) # Qbox
+    abinitioRead = qe_io.QERead(outFolder=outFolder, comm=comm)       # QE
+
+    # initialize LDOS instance.
     localDensityOfState = LDOS(read_obj=abinitioRead,
                                delta=delta,
                                comm=comm)
+
+    # compute LDOS along z axis (can be 'x' or 'y')
     localDensityOfState.computeLDOS(axis='z')
+
+    # obtain lcbm and lvbm
+    # lcbm: local CBM
+    # lvbm: local VBM
+    # lcbm and lvbm are 1d numpy.ndarray with size of FFT grid along chosen axis (z in this case).
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     if rank == 0:
+        # write lcbm and lvbm to file with fname: fileName
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, picName='ldos.pdf')
+        # draw lcbm and lvbm to chart with fname: picName
+        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=None, picName='ldos.pdf')
 ```
-see [`example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference
+see [`example/pp_example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference
 
 3. Run:
 ```
