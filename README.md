@@ -10,11 +10,13 @@ QCAT (Quantum Chemistry Analysis Toolkit) is a tool for analyzing data from quan
 * Optimized with [Cython](https://github.com/cython/cython)
 
 ## Installation
+To install qcat, clone the repository and
 ```bash
 # loading a system-provided MPI module (openmpi or intelmpi)
 module load intelmpi/2019.up7+intel-19.1.1
 conda create -n qcat python=3.10
 conda activate qcat
+cd qcat
 pip install .
 ```
 To update the package, please run:
