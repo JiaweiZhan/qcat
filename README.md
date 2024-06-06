@@ -88,7 +88,11 @@ module load intelmpi/2019.up7+intel-19.1.1
         # write lcbm and lvbm to file with fname: fileName
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
         # draw lcbm and lvbm to chart with fname: picName
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=None, picName='ldos.pdf')
+        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm,
+                                abs_length=None,
+                                xlabel="z axis",
+                                ylabel="Energy Level / eV",
+                                picName='ldos.pdf')
 ```
 see [`example/pp_example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference. Or simply run the example script:
 

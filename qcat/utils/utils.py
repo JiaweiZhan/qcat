@@ -134,13 +134,18 @@ def writeLocalBandEdge(lcbm, lvbm, fileName='ldos.txt'):
                 file_object.write('\n')
     print(f"\n\nLocal band edge is printed in {fileName}")
 
-def drawLocalBandEdge(lcbm, lvbm, z_length=None, kernel_size=15, picName='ldos.pdf'):
+def drawLocalBandEdge(lcbm, lvbm,
+                      abs_length=None,
+                      xlabel="z axis / bohr",
+                      ylabel="Energy Level / eV",
+                      kernel_size=15,
+                      picName='ldos.pdf'):
     if kernel_size % 2 == 0:
         kernel_size += 1
     fig, ax = plt.subplots(figsize=(10, 5))
-    if z_length is None:
-        z_length = len(lvbm)
-    x_axis = np.linspace(0, z_length, len(lcbm))
+    if abs_length is None:
+        abs_length = len(lcbm)
+    x_axis = np.linspace(0, abs_length, len(lcbm))
     # smooth
     # lvbm_smooth = savgol_filter(lvbm, 11, 3)
     # lcbm_smooth = savgol_filter(lcbm, 11, 3)
@@ -160,9 +165,9 @@ def drawLocalBandEdge(lcbm, lvbm, z_length=None, kernel_size=15, picName='ldos.p
 
     plt.plot(x_axis, lcbm_smooth, 'c')
     plt.plot(x_axis, lvbm_smooth, 'c')
-    plt.xlabel('z axis / bohr', fontsize=15)
-    plt.ylabel('Energy Level / eV', fontsize=15)
-    plt.xlim([0, z_length])
+    plt.xlabel(xlabel, fontsize=15)
+    plt.ylabel(ylabel, fontsize=15)
+    plt.xlim([0, abs_length])
     plt.savefig(picName, dpi=1000, bbox_inches='tight')
     print(f"Local band edge is drew on {picName}")
 

@@ -81,7 +81,11 @@ if __name__ == "__main__":
         # write lcbm and lvbm to file with fname: fileName
         utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
         # draw lcbm and lvbm to chart with fname: picName
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, picName='ldos.pdf')
+        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm,
+                                abs_length=None,
+                                xlabel="z axis",
+                                ylabel="Energy Level / eV",
+                                picName='ldos.pdf')
 
     # get the execution time
     # get the end time
