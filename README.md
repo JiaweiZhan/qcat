@@ -51,10 +51,11 @@ module load intelmpi/2019.up7+intel-19.1.1
 ```
 2. Create a python file to call functions from **qcat**
 ```python
+    from mpi4py import MPI
+    import json
+
     from qcat.pp import class_ldos
     from qcat.io_kernel import qe_io, qbox_io
-    from qcat.utils import utils
-    from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
