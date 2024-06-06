@@ -85,14 +85,12 @@ module load intelmpi/2019.up7+intel-19.1.1
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     if rank == 0:
-        # write lcbm and lvbm to file with fname: fileName
-        utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
-        # draw lcbm and lvbm to chart with fname: picName
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm,
-                                abs_length=None,
-                                xlabel="z axis",
-                                ylabel="Energy Level / eV",
-                                picName='ldos.pdf')
+        # write lcbm and lvbm to json file
+        data = {'lcbm': lcbm.tolist(), 'lvbm': lvbm.tolist()}
+        fname = "ldos.json"
+        with open(fname, 'w') as json_file:
+            json.dump(data, json_file)
+        logger.info(f"Data has been written to {fname}")
 ```
 see [`example/pp_example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference. Or simply run the example script:
 

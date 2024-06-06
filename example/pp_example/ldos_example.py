@@ -1,15 +1,18 @@
 import argparse
 import os
 import signal
-import numpy as np
-from qcat.pp import LDOS
-from qcat.io_kernel import qe_io, qbox_io
-from qcat.utils import utils
 from mpi4py import MPI
 import time
 from functools import partial
-import pickle
-import shutil
+import json
+from loguru import logger
+
+from qcat.pp import LDOS
+from qcat.io_kernel import qe_io, qbox_io
+from qcat.utils import utils
+from qcat.utils import setLogger
+
+setLogger()
 
 comm = MPI.COMM_WORLD
 
@@ -78,14 +81,12 @@ if __name__ == "__main__":
     lcbm, lvbm = localDensityOfState.localBandEdge()
 
     if rank == 0:
-        # write lcbm and lvbm to file with fname: fileName
-        utils.writeLocalBandEdge(lcbm=lcbm, lvbm=lvbm, fileName='ldos.txt')
-        # draw lcbm and lvbm to chart with fname: picName
-        utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm,
-                                abs_length=None,
-                                xlabel="z axis",
-                                ylabel="Energy Level / eV",
-                                picName='ldos.pdf')
+        # write lcbm and lvbm to json file
+        data = {'lcbm': lcbm.tolist(), 'lvbm': lvbm.tolist()}
+        fname = "ldos.json"
+        with open(fname, 'w') as json_file:
+            json.dump(data, json_file)
+        logger.info(f"Data has been written to {fname}")
 
     # get the execution time
     # get the end time
