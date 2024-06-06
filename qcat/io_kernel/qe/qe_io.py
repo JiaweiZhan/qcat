@@ -458,7 +458,7 @@ class QERead(Read):
 
     def read(
         self,
-        storeFolder: str,
+        storeFolder: str="./wfc/",
         real_space: bool = True,
         store_wfc: bool = True,
     ):

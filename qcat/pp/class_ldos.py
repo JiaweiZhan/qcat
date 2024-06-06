@@ -26,14 +26,15 @@ class LDOS:
         self.comm = comm
         self.read_obj = read_obj
 
-    def computeLDOS(self, storeFolder='./wfc'):
+    def computeLDOS(self, storeFolder='./wfc', axis='z'):
+        assert axis in ['x', 'y', 'z']
 
-        self.storeFolder = storeFolder 
+        self.storeFolder = storeFolder
         rank, size = 0, 1
         if self.comm:
             rank = self.comm.Get_rank()
             size = self.comm.Get_size()
-        self.read_obj.read(storeFolder=self.storeFolder)
+        self.read_obj.read(storeFolder=self.storeFolder, real_space=True)
 
         with open(storeFolder + '/info.pickle', 'rb') as handle:
             xml_data = pickle.load(handle)
@@ -45,6 +46,20 @@ class LDOS:
         nks = numOcc.shape[1]
         nbnd = numOcc.shape[2]
         fft_grid = xml_data['fftw']
+
+        ldos_grid = 0
+        axis_ave = (0, 1,)
+        if axis == 'z':
+            ldos_grid = fft_grid[2]
+            axis_ave = (0, 1,)
+        elif axis == 'y':
+            ldos_grid = fft_grid[1]
+            axis_ave = (0, 2,)
+        elif axis == 'x':
+            ldos_grid = fft_grid[0]
+            axis_ave = (1, 2,)
+        else:
+            raise NotImplementedError
 
         if rank == 0:
             if np.all(numOcc > 0):
@@ -59,7 +74,7 @@ class LDOS:
         if self.comm:
             self.comm.Barrier()
 
-        ksStateZAve_loc = np.zeros((nspin, nks, nbnd, fft_grid[2]), dtype=np.double)
+        ksStateZAve_loc = np.zeros((nspin, nks, nbnd, ldos_grid), dtype=np.double)
 
         wfcStored = [name for name in os.listdir(storeFolder) if "wfc" in name]
 
@@ -70,7 +85,7 @@ class LDOS:
                 ik = int(fileName.split('.')[0].split('_')[-3])
                 ispin = int(fileName.split('.')[0].split('_')[-4])
                 evc_r = np.load(wfcName)
-                ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=(0, 1,))
+                ksStateZAve_loc[ispin - 1, ik - 1, ibnd - 1, :] = np.sum(np.absolute(evc_r) ** 2, axis=axis_ave)
 
         ksStateZAve = np.zeros_like(ksStateZAve_loc)
         if self.comm:
@@ -78,10 +93,10 @@ class LDOS:
         else:
             ksStateZAve = ksStateZAve_loc
 
-        lcbm_loc = np.zeros(fft_grid[2])
-        lvbm_loc = np.zeros(fft_grid[2])
+        lcbm_loc = np.zeros(ldos_grid)
+        lvbm_loc = np.zeros(ldos_grid)
 
-        for z in range(fft_grid[2]):
+        for z in range(ldos_grid):
             if z % size == rank:
                 # ksStateZAve: [ispin, ik, ibnd, z]
                 preFactor = ksStateZAve[:, :, :, z]
@@ -130,6 +145,7 @@ class LDOS:
         else:
             self.lcbm = lcbm_loc
             self.lvbm = lvbm_loc
+        self.read_obj.clean_wfc(storeFolder=self.storeFolder)
 
     def localBandEdge(self):
         return self.lcbm, self.lvbm
