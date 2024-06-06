@@ -17,6 +17,7 @@ module load intelmpi/2019.up7+intel-19.1.1
 conda create -n qcat python=3.10
 conda activate qcat
 cd qcat
+rm -rf .git # remove git track
 pip install .
 ```
 To update the package, please run:
