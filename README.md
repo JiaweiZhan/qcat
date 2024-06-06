@@ -50,8 +50,6 @@ module load intelmpi/2019.up7+intel-19.1.1
 ```
 2. Create a python file to call functions from **qcat**
 ```python
-    # ldos_example.py
-
     from qcat.pp import class_ldos
     from qcat.io_kernel import qe_io, qbox_io
     from qcat.utils import utils
@@ -91,13 +89,12 @@ module load intelmpi/2019.up7+intel-19.1.1
         # draw lcbm and lvbm to chart with fname: picName
         utils.drawLocalBandEdge(lcbm=lcbm, lvbm=lvbm, z_length=None, picName='ldos.pdf')
 ```
-see [`example/pp_example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference
+see [`example/pp_example/ldos_example.py`](./example/pp_example/ldos_example.py) for reference. Or simply run the example script:
 
-3. Run:
 ```
-mpirun [-np NTASKS] python3 ldos_example.py [-h] [-a ABINITIO] [-s SAVEFILEFOLDER] [-d DELTA]
+mpirun [-np NTASKS] python3 example/pp_example/ldos_example.py [-h] [-a ABINITIO] [-s SAVEFILEFOLDER] [-d DELTA] [-o ORIENTATION]
 ```
-4. Configuration:
+3. Configuration of ldos_example.py:
 ```
 optional arguments:
   -h, --help            show this help message and exit
@@ -108,6 +105,8 @@ optional arguments:
                         ./scf.save
   -d DELTA, --delta DELTA
                         delta that control local VB/CB. Default: 0.001
+  -o ORIENTATION, --orientation ORIENTATION
+                        LDOS orientation. Default: z
 ```
 
 ## Requirements
