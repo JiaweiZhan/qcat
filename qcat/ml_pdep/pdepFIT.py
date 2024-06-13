@@ -7,7 +7,6 @@ import os
 import numpy as np
 from scipy.linalg import eigh
 import math
-from typing import List
 from loguru import logger
 import torch
 import time
@@ -17,6 +16,7 @@ from westpy import qe_io
 from qcat.io_kernel import pyscfHelper, QEProvider
 from qcat.utils import setLogger
 from .core import *
+from .oneCenterAlgo import *
 
 setLogger()
 
@@ -190,28 +190,6 @@ class PDEP2AO(object):
         atomIdx.append((atom_start, mat_dim))
         return atomIdx
 
-    @staticmethod
-    def one_center_DDRF(
-        QAQ: np.ndarray,
-        S: np.ndarray,
-        atomIdx: List,
-    ):
-        eigval, coeff = eigh(QAQ, S)
-        sigma_tilde = coeff @ np.diag(eigval) @ coeff.T
-        qaq_1cddrf = np.zeros_like(QAQ)
-        weight = np.zeros_like(sigma_tilde)
-        for atom_start, atom_end in atomIdx:
-            weight[:, :] = 0.0
-            weight[atom_start:atom_end] = 0.5
-            weight[:, atom_start:atom_end] = 0.5
-            weight[atom_start:atom_end, atom_start:atom_end] = 1.0
-            sigma_tilde_i = sigma_tilde * weight
-            si_bar = S[atom_start:atom_end]
-            si_inv = np.linalg.inv(S[atom_start:atom_end, atom_start:atom_end])
-            lhs = si_bar.T @ si_inv @ si_bar
-            qaq_1cddrf += lhs @ sigma_tilde_i @ lhs
-        return qaq_1cddrf
-
     def run(
         self,
         outDir: str = "./log",
@@ -231,7 +209,7 @@ class PDEP2AO(object):
             precision in possible_precision
         ), f"precision should be one of {possible_precision}"
 
-        possible_method = ["2c", "1c"]
+        possible_method = ["2c", "1c", "1c_v2"]
         assert method in possible_method, f"method should be one of {possible_method}"
 
         if not os.path.exists(outDir):
@@ -259,10 +237,15 @@ class PDEP2AO(object):
         QAQ = QAQ.numpy()
         basis_g = basis_g.numpy()
 
-        if method == "1c":
+        if "1c" in method:
             atomIdx = self.atomIdx(labels)
             assert len(atomIdx) == self.pyscf_obj.cell.natm
-            QAQ = self.one_center_DDRF(QAQ, S, atomIdx)
+            if method == "1c":
+                QAQ = one_center_DDRF(QAQ, S, atomIdx)
+            elif method == "1c_v2":
+                QAQ = one_center_DDRF_v2(QAQ, S, atomIdx)
+            else:
+                raise NotImplementedError
 
         if qaq_threshold:
             logger.info(f"Apply threshold {qaq_threshold:^5.2e} to QAQ matrix.")
