@@ -238,6 +238,7 @@ class PDEP2AO(object):
         basis_g = basis_g.numpy()
 
         if "1c" in method:
+            npdep = None
             atomIdx = self.atomIdx(labels)
             assert len(atomIdx) == self.pyscf_obj.cell.natm
             if method == "1c":
