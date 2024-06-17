@@ -49,7 +49,7 @@ if __name__ == "__main__":
     conf_tab = {"software": args.abinitio,
                 "saveFileFolder": args.saveFileFolder,
                 "delta": args.delta,
-                "axis": args.axis,
+                "orientation": args.orientation,
                 "MPI size": comm.Get_size()}
     utils.print_conf(conf_tab)
 
