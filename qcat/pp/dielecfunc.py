@@ -131,7 +131,8 @@ class DielecFunc(object):
         '''
         return gaussian3d(unit_cell, r1, r2, spread, dspl_norm)
 
-    def computeLocalPolarization(self):
+    def computeLocalPolarization(self,
+                                 spread_factor:float=1.0):
         self.MLWFCenterDspl()
         nspin = self.nspin
         i, j, k = np.indices((self.npv[0], self.npv[1], self.npv[2]), dtype=np.float64)
@@ -145,10 +146,11 @@ class DielecFunc(object):
             center = self.center[ispin]
             spread = self.spread[ispin]
             dspl_norm = np.sum(self.dspl[ispin] * mask[::2][:, None, :], axis=-1, keepdims=True)
-            self.polarization[ispin] =  self.gaussian3d(self.unit_cell, r1, center, spread, dspl_norm).reshape((-1, *self.npv)) * -1.0
+            self.polarization[ispin] =  self.gaussian3d(self.unit_cell, r1, center, spread * spread_factor, dspl_norm).reshape((-1, *self.npv)) * -1.0
 
-    def computeDielecFunc(self):
-        self.computeLocalPolarization()
+    def computeDielecFunc(self,
+                          spread_factor:float=1.0):
+        self.computeLocalPolarization(spread_factor)
         nspin = self.nspin
         nefield = self.e_field.shape[0]
         eps = {}
