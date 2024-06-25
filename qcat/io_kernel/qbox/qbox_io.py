@@ -91,8 +91,6 @@ class QBOXRead(Read):
         volume = 0
         nspin, ecut, nel, nempty, nbnd = 0, 0, 0, 0, None
         occ = {}
-        for ispin in range(len(self.eigens)):
-            occ[ispin] = []
         encoding = "text"
         ispin, iwfc = 0, 0
 
@@ -126,7 +124,7 @@ class QBOXRead(Read):
                     nbnd[0] = (nel + 1) // 2 + nempty
                     nbnd[1] = (nel) // 2 + nempty
 
-                for key in occ.keys():
+                for key in range(nspin):
                     occ[key] = np.zeros(nbnd[int(key)], dtype=np.int32)
                 if nspin == 1:
                     occ[0][:nel // 2] = 1
