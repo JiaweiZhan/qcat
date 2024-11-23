@@ -3,22 +3,33 @@ import numpy as np
 from ..utils.gpu_kernels import gaussian3d
 
 class DielecFunc(object):
-    def __init__(self, xml_fname):
+    def __init__(self,
+                 xml_fname=None,
+                 ff_amplitude=0.0,
+                 unit_cell=np.zeros((3, 3)),
+                 npv=np.zeros(3, dtype=np.int32),
+                 nspin=1,
+                 e_field=np.array([]),
+                 mlwf_center={},
+                 mlwf_occupation={},
+                 mlwf_spread={},
+                 ):
         self.xml_fname = xml_fname
-        self.ff_amplitude = 0.0
-        self.unit_cell = np.zeros((3, 3)) # unit_cell.shape = (3, 3)
-        self.npv = np.zeros(3, dtype=np.int32)
-        self.nspin = 1
-        self.e_field = np.array([]) # e_field.shape = (nefield, 3)
-        self.mlwf_center = {}       # mlwf_center["0"].shape = (nefield, nmlwf_up, 3)
-        self.mlwf_occupation = {}   # mlwf_occupation["0"].shape = (nefield, nmlwf_up, 1)
-        self.mlwf_spread = {}       # mlwf_spread["0"].shape = (nefield, nmlwf_up, 1)
-        self.center = {}            # center["0"].shape = (nefield // 2, nmlwf_up, 3) in relative scale
-        self.dspl = {}              # dspl["0"].shape = (nefield // 2, nmlwf_up, 3)   in bohr unit
-        self.spread = {}            # spread["0"].shape = (nefield // 2, nmlwf_up, 1) in bohr unit
-        self.polarization = {}      # polarization["0"].shape = (nefield // 2, npv[0], npv[1], npv[2])
+        self.ff_amplitude = ff_amplitude
+        self.unit_cell = unit_cell # unit_cell.shape = (3, 3)
+        self.npv = npv
+        self.nspin = nspin
+        self.e_field = e_field                   # e_field.shape = (nefield, 3)
+        self.mlwf_center = mlwf_center           # mlwf_center["0"].shape = (nefield, nmlwf_up, 3)
+        self.mlwf_occupation = mlwf_occupation   # mlwf_occupation["0"].shape = (nefield, nmlwf_up, 1)
+        self.mlwf_spread = mlwf_spread           # mlwf_spread["0"].shape = (nefield, nmlwf_up, 1)
+        self.center = {}                         # center["0"].shape = (nefield // 2, nmlwf_up, 3) in relative scale
+        self.dspl = {}                           # dspl["0"].shape = (nefield // 2, nmlwf_up, 3)   in bohr unit
+        self.spread = {}                         # spread["0"].shape = (nefield // 2, nmlwf_up, 1) in bohr unit
+        self.polarization = {}                   # polarization["0"].shape = (nefield // 2, npv[0], npv[1], npv[2])
 
-        self.parse_xml()
+        if xml_fname:
+            self.parse_xml()
 
     def parse_xml(self):
         context = etree.iterparse(self.xml_fname, huge_tree=True)
